@@ -38,11 +38,11 @@ const vibrate = (type='light') => {
 }
 
 const C = {
-  bg:'#0b1017',surface:'#111820',surface2:'#161f2a',
-  border:'rgba(56,189,248,0.12)',border2:'rgba(56,189,248,0.06)',
-  accent:'#38bdf8',gold:'#f59e0b',green:'#22c55e',
-  red:'#f87171',muted:'#4a6070',text:'#e2f0f9',dim:'#6b8fa8',purple:'#a78bfa',
-  w:['#38bdf8','#22c55e','#f59e0b','#a78bfa','#fb7185','#34d399','#60a5fa','#f472b6'],
+  bg:'#efeee9',surface:'#ffffff',surface2:'#f6f5f0',
+  border:'rgba(23,23,23,0.09)',border2:'rgba(23,23,23,0.05)',
+  accent:'#171717',yellow:'#ffd60a',ink:'#171717',gold:'#b7791f',green:'#15803d',
+  red:'#e5392f',muted:'#8a8a84',text:'#171717',dim:'#5b5b57',purple:'#6d4fd1',
+  w:['#171717','#15803d','#b7791f','#6d4fd1','#e5392f','#0f766e','#2563eb','#be185d'],
 }
 const fmt  = n => Math.round(n||0).toLocaleString('uk-UA')
 const fmtH = n => Number(n||0).toFixed(1)
@@ -50,11 +50,11 @@ const todayStr = () => {
   const d = new Date()
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
-const inp = {background:'rgba(255,255,255,0.05)',border:`1px solid ${C.border}`,borderRadius:8,color:C.text,padding:'11px 14px',fontSize:15,fontFamily:'inherit',width:'100%',outline:'none',WebkitAppearance:'none'}
+const inp = {background:'rgba(23,23,23,0.04)',border:`1px solid ${C.border}`,borderRadius:8,color:C.text,padding:'11px 14px',fontSize:15,fontFamily:'inherit',width:'100%',outline:'none',WebkitAppearance:'none'}
 
 // ── UI Primitives ──────────────────────────────────────────
 const Card = ({children,top,style={}}) =>
-  <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:12,padding:'16px 18px',...(top?{borderTop:`2px solid ${top}`}:{}),overflowX:'hidden',...style}}>{children}</div>
+  <div style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:20,padding:'16px 18px',...(top?{borderTop:`2px solid ${top}`}:{}),overflowX:'hidden',...style}}>{children}</div>
 const Lbl = ({children}) =>
   <div style={{fontSize:10,color:C.muted,letterSpacing:2,textTransform:'uppercase',marginBottom:6}}>{children}</div>
 const SecTitle = ({children,right}) =>
@@ -73,8 +73,8 @@ const Prog = ({val,max,color}) =>
   </div>
 
 function Sheet({onClose,title,children}) {
-  return <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.85)',display:'flex',alignItems:'flex-end',zIndex:200}}>
-    <div onClick={e=>e.stopPropagation()} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:'16px 16px 0 0',padding:'20px 20px 44px',width:'100%',maxHeight:'92vh',overflowY:'auto'}}>
+  return <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(23,23,23,0.55)',display:'flex',alignItems:'flex-end',zIndex:200}}>
+    <div onClick={e=>e.stopPropagation()} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:'26px 26px 0 0',padding:'20px 20px 44px',width:'100%',maxHeight:'92vh',overflowY:'auto'}}>
       <div style={{width:40,height:4,background:C.muted,borderRadius:2,margin:'0 auto 16px'}}/>
       {title&&<div style={{fontSize:15,fontWeight:700,color:C.text,marginBottom:18}}>{title}</div>}
       {children}
@@ -83,11 +83,11 @@ function Sheet({onClose,title,children}) {
 }
 
 function Header({title,sub,onRefresh,onBack,right}) {
-  return <div style={{background:C.surface,borderBottom:`1px solid ${C.border}`,padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
+  return <div style={{background:C.bg,borderBottom:'none',padding:'14px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:10}}>
     <div style={{display:'flex',alignItems:'center',gap:8}}>
       {onBack&&<button onClick={onBack} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.accent,borderRadius:8,padding:'5px 10px',fontSize:12,cursor:'pointer',fontFamily:'inherit'}}>←</button>}
       <div>
-        <div style={{fontSize:14,fontWeight:700,color:C.accent,letterSpacing:1}}>{title}</div>
+        <div style={{fontSize:17,fontWeight:800,color:C.ink,letterSpacing:0.2}}>{title}</div>
         {sub&&<div style={{fontSize:10,color:C.muted}}>{sub}</div>}
       </div>
     </div>
@@ -116,7 +116,7 @@ function MonthPicker({year,month,onChange}) {
       const d = new Date(now.getFullYear(), now.getMonth()-5+i)
       const y = d.getFullYear(), m = d.getMonth()
       const active = y===year&&m===month
-      return <button key={i} onClick={()=>onChange(y,m)} style={{whiteSpace:'nowrap',padding:'6px 12px',borderRadius:20,border:`1px solid ${active?C.accent:C.border}`,background:active?'rgba(56,189,248,0.1)':'transparent',color:active?C.accent:C.muted,cursor:'pointer',fontSize:11,fontFamily:'inherit',flexShrink:0}}>
+      return <button key={i} onClick={()=>onChange(y,m)} style={{whiteSpace:'nowrap',padding:'6px 12px',borderRadius:20,border:`1px solid ${active?C.accent:C.border}`,background:active?'rgba(255,214,10,0.28)':'transparent',color:active?C.accent:C.muted,cursor:'pointer',fontSize:11,fontFamily:'inherit',flexShrink:0}}>
         {MONTHS_SHORT[m]} {y!==now.getFullYear()?y:''}
       </button>
     })}
@@ -125,7 +125,7 @@ function MonthPicker({year,month,onChange}) {
 
 const TTip = ({active,payload,label}) => {
   if (!active||!payload?.length) return null
-  return <div style={{background:'#1a2535',border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 14px',fontSize:11}}>
+  return <div style={{background:'#ffffff',border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 14px',fontSize:11}}>
     <div style={{color:C.accent,marginBottom:4}}>{label}</div>
     {payload.map((p,i)=><div key={i} style={{color:p.color||C.text}}>{p.name}: {fmt(p.value)} грн</div>)}
   </div>
@@ -135,7 +135,7 @@ function DaysExpand({days,rateHour,ratePack,longDayHours=10,onEdit,isOwner}) {
   const [open,setOpen] = useState(false)
   if (!days?.length) return null
   return <div>
-    <button onClick={()=>setOpen(o=>!o)} style={{width:'100%',background:'rgba(56,189,248,0.05)',border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 14px',color:C.accent,cursor:'pointer',fontSize:12,fontFamily:'inherit',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+    <button onClick={()=>setOpen(o=>!o)} style={{width:'100%',background:'rgba(23,23,23,0.05)',border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 14px',color:C.accent,cursor:'pointer',fontSize:12,fontFamily:'inherit',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
       <span>📅 По днях ({days.length})</span>
       <span>{open?'▲':'▼'}</span>
     </button>
@@ -196,7 +196,7 @@ function PayslipModal({w,month,year,onClose}) {
     <button onClick={()=>{
       if (navigator.share) navigator.share({text:lines})
       else if (navigator.clipboard) { navigator.clipboard.writeText(lines); vibrate('medium') }
-    }} style={{width:'100%',background:C.accent,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+    }} style={{width:'100%',background:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
       📋 Скопіювати / Поділитись
     </button>
   </Sheet>
@@ -256,7 +256,7 @@ function EditDayForm({day,worker,onClose,onSaved,tgId,tgName,cfg}) {
         <input type="number" inputMode="numeric" value={packs} onChange={e=>setPacks(e.target.value)} style={inp}/>
       </div>
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
-      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.accent,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         {loading?'Збереження...':success?'✓ Готово!':'Зберегти зміни'}
       </button>
       <button type="button" onClick={handleDelete} disabled={loading||success}
@@ -368,7 +368,7 @@ function ShiftForm({worker,allWorkers,isOwner,onClose,onSaved,tgId,tgName,cfg}) 
       <div><Lbl>ТИП</Lbl>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
           {[['hours','⏱ Години'],['packs','📦 Пачки'],['mixed','⏱📦 Змішана']].map(([k,l])=>
-            <button key={k} type="button" onClick={()=>setType(k)} style={{padding:'10px 4px',borderRadius:8,border:`1px solid ${type===k?C.accent:C.border}`,background:type===k?'rgba(56,189,248,0.1)':'transparent',color:type===k?C.accent:C.dim,cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:type===k?700:400}}>{l}</button>
+            <button key={k} type="button" onClick={()=>setType(k)} style={{padding:'10px 4px',borderRadius:8,border:`1px solid ${type===k?C.accent:C.border}`,background:type===k?'rgba(255,214,10,0.28)':'transparent',color:type===k?C.accent:C.dim,cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:type===k?700:400}}>{l}</button>
           )}
         </div>
       </div>
@@ -384,7 +384,7 @@ function ShiftForm({worker,allWorkers,isOwner,onClose,onSaved,tgId,tgName,cfg}) 
           <div style={{display:'flex',gap:6}}>
             {[['range','З / По'],['manual','Кількість']].map(([k,l])=>(
               <button key={k} type="button" onClick={()=>setHoursMode(k)}
-                style={{padding:'4px 12px',borderRadius:20,fontSize:11,fontFamily:'inherit',cursor:'pointer',border:`1px solid ${hoursMode===k?C.accent:C.border}`,background:hoursMode===k?'rgba(56,189,248,0.1)':'transparent',color:hoursMode===k?C.accent:C.dim}}>
+                style={{padding:'4px 12px',borderRadius:20,fontSize:11,fontFamily:'inherit',cursor:'pointer',border:`1px solid ${hoursMode===k?C.accent:C.border}`,background:hoursMode===k?'rgba(255,214,10,0.28)':'transparent',color:hoursMode===k?C.accent:C.dim}}>
                 {l}
               </button>
             ))}
@@ -409,7 +409,7 @@ function ShiftForm({worker,allWorkers,isOwner,onClose,onSaved,tgId,tgName,cfg}) 
               onChange={e=>setHours(e.target.value)} placeholder="напр. 10" style={inp}/>}
 
         {/* Підказка з розрахунком */}
-        {rawH>0&&<div style={{fontSize:11,color:C.accent,marginTop:6,padding:'6px 10px',background:'rgba(56,189,248,0.06)',borderRadius:6}}>
+        {rawH>0&&<div style={{fontSize:11,color:C.accent,marginTop:6,padding:'6px 10px',background:'rgba(23,23,23,0.06)',borderRadius:6}}>
           {hoursMode==='range'
             ? <>{fmtH(rangeH)} год − {lb} год обід = <b>{fmtH(actualH)} год</b> · {fmt(actualH*(sel?.rateHour||0))} грн</>
             : <><b>{fmtH(actualH)} год</b> · {fmt(actualH*(sel?.rateHour||0))} грн</>}
@@ -426,7 +426,7 @@ function ShiftForm({worker,allWorkers,isOwner,onClose,onSaved,tgId,tgName,cfg}) 
         <span style={{fontSize:18,fontWeight:700,color:C.green}}>{fmt(earn)} грн</span>
       </div>}
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
-      <button type="submit" disabled={loading} style={{background:C.accent,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:loading?.7:1}}>
+      <button type="submit" disabled={loading} style={{background:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:loading?.7:1}}>
         {loading?'Збереження...':'Зберегти зміну'}
       </button>
     </form>
@@ -472,7 +472,7 @@ function AdvanceForm({worker,allWorkers,isOwner,onClose,onSaved,tgId,tgName}) {
         <input type="number" inputMode="numeric" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="або введи вручну" style={inp}/>
       </div>
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
-      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.gold,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.gold,color:'#fff',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         {loading?'Збереження...':success?'✓ Збережено!':'Видати аванс'}
       </button>
     </form>
@@ -529,7 +529,7 @@ function FineForm({worker,allWorkers,onClose,onSaved,tgId,tgName}) {
       </div>}
       <div><Lbl>ПРИЧИНА</Lbl><input type="text" value={reason} onChange={e=>setReason(e.target.value)} placeholder="Запізнення / прогул / брак" style={inp}/></div>
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
-      <button type="submit" disabled={loading||success||!amount} style={{background:success?C.green:C.red,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:!amount?.5:1}}>
+      <button type="submit" disabled={loading||success||!amount} style={{background:success?C.green:C.red,color:'#fff',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:!amount?.5:1}}>
         {loading?'Збереження...':success?'✓ Збережено!':'Оштрафувати'}
       </button>
     </form>
@@ -578,7 +578,7 @@ function BonusForm({worker,allWorkers,onClose,onSaved,tgId,tgName}) {
           {amount>0&&<button type="button" onClick={()=>setAmount(0)} style={{background:'transparent',border:'none',color:C.red,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>Скинути</button>}
         </div>
         <div style={{display:'flex',gap:8,marginBottom:10}}>
-          {[200,300,500,1000].map(a=><button key={a} type="button" onClick={()=>addAmount(a)} style={{flex:1,padding:'8px 0',borderRadius:8,border:`1px solid ${C.gold}`,background:'rgba(245,158,11,0.1)',color:C.gold,fontSize:12,cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>+{a}</button>)}
+          {[200,300,500,1000].map(a=><button key={a} type="button" onClick={()=>addAmount(a)} style={{flex:1,padding:'8px 0',borderRadius:8,border:`1px solid ${C.gold}`,background:'rgba(183,121,31,0.1)',color:C.gold,fontSize:12,cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>+{a}</button>)}
         </div>
         <input type="number" inputMode="numeric" value={amount||''} onChange={e=>setAmount(e.target.value)} placeholder="або введи вручну" style={inp}/>
       </div>
@@ -588,7 +588,7 @@ function BonusForm({worker,allWorkers,onClose,onSaved,tgId,tgName}) {
       </div>}
       <div><Lbl>ПРИЧИНА</Lbl><input type="text" value={reason} onChange={e=>setReason(e.target.value)} placeholder="За перевиконання плану" style={inp}/></div>
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
-      <button type="submit" disabled={loading||success||!amount} style={{background:success?C.green:C.gold,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:!amount?.5:1}}>
+      <button type="submit" disabled={loading||success||!amount} style={{background:success?C.green:C.gold,color:'#fff',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:!amount?.5:1}}>
         {loading?'Збереження...':success?'✓ Збережено!':'Нарахувати'}
       </button>
     </form>
@@ -687,7 +687,7 @@ function AddDebtForm({worker,allWorkers,onClose,onSaved,tgId,tgName}) {
 function Toggle({on,onClick,label,color}) {
   return <div onClick={onClick} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'12px 14px',background:'rgba(255,255,255,0.03)',border:`1px solid ${C.border}`,borderRadius:10,cursor:'pointer'}}>
     <span style={{fontSize:13,color:C.text}}>{label}</span>
-    <div style={{width:46,height:26,borderRadius:13,background:on?(color||C.green):'rgba(255,255,255,0.12)',position:'relative',transition:'background .2s',flexShrink:0}}>
+    <div style={{width:46,height:26,borderRadius:13,background:on?(color||C.green):'rgba(23,23,23,0.15)',position:'relative',transition:'background .2s',flexShrink:0}}>
       <div style={{width:20,height:20,borderRadius:'50%',background:'#fff',position:'absolute',top:3,left:on?23:3,transition:'left .2s'}}/>
     </div>
   </div>
@@ -799,7 +799,7 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg}) {
           </div>
         </>}
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
-      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.accent,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         {loading?'Збереження...':success?'✓ Збережено!':'Зберегти'}
       </button>
     </form>
@@ -866,7 +866,7 @@ function EditWorkerForm({worker,onClose,onSaved,tgId,tgName}) {
       <div><Lbl>ПІБ</Lbl><input type="text" value={name} onChange={e=>setName(e.target.value)} style={inp}/></div>
       <div><Lbl>TELEGRAM ID</Lbl><input type="number" value={newTgId} onChange={e=>setNewTgId(e.target.value)} style={inp}/></div>
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
-      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.accent,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         {loading?'Збереження...':success?'✓ Збережено!':'Зберегти'}
       </button>
 
@@ -923,7 +923,7 @@ function AddWorkerForm({onClose,onSaved,tgId,tgName}) {
       <div><Lbl>ТИП</Lbl>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
           {[['shift','⏱ Погодинний'],['fixed','💰 Фіксована']].map(([k,l])=>
-            <button key={k} type="button" onClick={()=>setType(k)} style={{padding:'10px',borderRadius:8,border:`1px solid ${type===k?C.accent:C.border}`,background:type===k?'rgba(56,189,248,0.1)':'transparent',color:type===k?C.accent:C.dim,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:type===k?700:400}}>{l}</button>
+            <button key={k} type="button" onClick={()=>setType(k)} style={{padding:'10px',borderRadius:8,border:`1px solid ${type===k?C.accent:C.border}`,background:type===k?'rgba(255,214,10,0.28)':'transparent',color:type===k?C.accent:C.dim,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:type===k?700:400}}>{l}</button>
           )}
         </div></div>
       <div><Lbl>ПІБ</Lbl><input type="text" value={name} onChange={e=>setName(e.target.value)} placeholder="Іван Петренко" style={inp}/></div>
@@ -940,7 +940,7 @@ function AddWorkerForm({onClose,onSaved,tgId,tgName}) {
         <div><Lbl>ПОСАДА</Lbl><input type="text" value={role} onChange={e=>setRole(e.target.value)} placeholder="Бухгалтер" style={inp}/></div>
       </>}
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
-      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.green,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.green,color:'#fff',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         {loading?'Збереження...':success?'✓ Додано!':'Додати працівника'}
       </button>
     </form>
@@ -995,6 +995,33 @@ function SettingsForm({cfg,onClose,onSaved,tgId,tgName}) {
 // ================================================================
 // РОЗДІЛ БОРГІВ (для власника)
 // ================================================================
+function FinesView({workers,onBack,onRefresh,tgId,tgName,month,year}) {
+  const [modal,setModal]=useState(false)
+  const fined = workers.filter(w=>(w.totalFines||0)>0)
+  const total = fined.reduce((s,w)=>s+w.totalFines,0)
+  return <div style={{minHeight:'100vh',background:C.bg,paddingBottom:40}}>
+    <Header title="🚫 Штрафи" sub={`${MONTHS_UA[month]} ${year}`} onBack={onBack}/>
+    <div style={{padding:'8px 16px 0',display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{background:C.ink,borderRadius:26,padding:'20px 22px',color:'#fff'}}>
+        <div style={{fontSize:11,letterSpacing:2,opacity:.6,textTransform:'uppercase'}}>Штрафів за місяць</div>
+        <div style={{fontSize:30,fontWeight:800,marginTop:4}}>{fmt(total)} ₴</div>
+        <div style={{fontSize:12,opacity:.6,marginTop:2}}>{fined.length} працівників</div>
+      </div>
+      {fined.length===0&&<div style={{textAlign:'center',color:C.muted,fontSize:14,padding:32}}>Цього місяця штрафів немає</div>}
+      {fined.map(w=><div key={w.tgId} style={{background:C.surface,border:`2px solid ${C.red}`,borderRadius:20,padding:'14px 16px'}}>
+        <div style={{display:'flex',justifyContent:'space-between',fontWeight:700,fontSize:14,marginBottom:6}}>
+          <span>{w.name}</span><span style={{color:C.red}}>−{fmt(w.totalFines)} ₴</span>
+        </div>
+        {(w.fines||[]).map((f,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:12,color:C.dim,padding:'3px 0'}}>
+          <span>{f.date?.slice(5).split('-').reverse().join('.')} · {f.reason||'без причини'}</span><span>{fmt(f.amount)} ₴</span>
+        </div>)}
+      </div>)}
+      <button onClick={()=>setModal(true)} style={{background:C.red,color:'#fff',border:'none',borderRadius:16,padding:14,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🚫 Оштрафувати</button>
+    </div>
+    {modal&&<FineForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(false)} onSaved={()=>{onRefresh()}} tgId={tgId} tgName={tgName}/>}
+  </div>
+}
+
 function DebtsView({workers,onBack,onRefresh,tgId,tgName}) {
   const [modal,  setModal]  = useState(null)
   const [selW,   setSelW]   = useState(null)
@@ -1141,7 +1168,7 @@ function ShipmentForm({refs,editGroup,onClose,onSaved,onRefsChanged,tgId,tgName}
       </button>
 
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
-      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.accent,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         {loading?'Збереження...':success?'✓ Збережено!':isEdit?'Зберегти зміни':'Зберегти відправку'}
       </button>
     </form>
@@ -1177,13 +1204,13 @@ function RefsManager({refs,onClose,onChanged}) {
   return <Sheet onClose={onClose} title="⚙️ Довідники">
     <div style={{display:'flex',gap:6,marginBottom:14}}>
       {Object.entries(cfg).map(([k,v])=>(
-        <button key={k} onClick={()=>{setTab(k);setNewVal('')}} style={{flex:1,padding:'8px 4px',borderRadius:8,border:`1px solid ${tab===k?C.accent:C.border}`,background:tab===k?'rgba(56,189,248,0.1)':'transparent',color:tab===k?C.accent:C.dim,cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:tab===k?700:400}}>{v.title}</button>
+        <button key={k} onClick={()=>{setTab(k);setNewVal('')}} style={{flex:1,padding:'8px 4px',borderRadius:8,border:`1px solid ${tab===k?C.accent:C.border}`,background:tab===k?'rgba(255,214,10,0.28)':'transparent',color:tab===k?C.accent:C.dim,cursor:'pointer',fontSize:11,fontFamily:'inherit',fontWeight:tab===k?700:400}}>{v.title}</button>
       ))}
     </div>
 
     <div style={{display:'flex',gap:6,marginBottom:14}}>
       <input value={newVal} onChange={e=>setNewVal(e.target.value)} placeholder={`Нова назва...`} style={{...inp,fontSize:13}}/>
-      <button onClick={handleAdd} disabled={busy} style={{background:C.green,border:'none',color:'#000',borderRadius:8,padding:'0 16px',fontSize:18,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>+</button>
+      <button onClick={handleAdd} disabled={busy} style={{background:C.green,border:'none',color:'#fff',borderRadius:8,padding:'0 16px',fontSize:18,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>+</button>
     </div>
 
     <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:'50vh',overflowY:'auto'}}>
@@ -1263,13 +1290,13 @@ function ShipmentsView({onBack,tgId,tgName,year,month,onMonthChange}) {
     <div style={{padding:'16px 16px 0',display:'flex',flexDirection:'column',gap:14}}>
       <MonthPicker year={year} month={month} onChange={(y,m)=>{onMonthChange(y,m);loadRows(y,m)}}/>
 
-      <button onClick={()=>setModal('new')} style={{background:C.accent,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+      <button onClick={()=>setModal('new')} style={{background:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         ➕ Нова відправка
       </button>
 
       <div style={{display:'flex',gap:8}}>
         {[['stats','📊 Статистика'],['list','📋 Відправки']].map(([k,l])=>
-          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'10px',borderRadius:8,border:`1px solid ${tab===k?C.accent:C.border}`,background:tab===k?'rgba(56,189,248,0.1)':'transparent',color:tab===k?C.accent:C.dim,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:tab===k?700:400}}>{l}</button>
+          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'10px',borderRadius:8,border:`1px solid ${tab===k?C.accent:C.border}`,background:tab===k?'rgba(255,214,10,0.28)':'transparent',color:tab===k?C.accent:C.dim,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:tab===k?700:400}}>{l}</button>
         )}
       </div>
 
@@ -1285,7 +1312,7 @@ function ShipmentsView({onBack,tgId,tgName,year,month,onMonthChange}) {
 
         <div style={{display:'flex',gap:8}}>
           {[['mat','По матеріалах'],['firm','По фірмах']].map(([k,l])=>
-            <button key={k} onClick={()=>setStatTab(k)} style={{flex:1,padding:'9px',borderRadius:8,border:`1px solid ${statTab===k?C.gold:C.border}`,background:statTab===k?'rgba(245,158,11,0.1)':'transparent',color:statTab===k?C.gold:C.dim,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:statTab===k?700:400}}>{l}</button>
+            <button key={k} onClick={()=>setStatTab(k)} style={{flex:1,padding:'9px',borderRadius:8,border:`1px solid ${statTab===k?C.gold:C.border}`,background:statTab===k?'rgba(183,121,31,0.1)':'transparent',color:statTab===k?C.gold:C.dim,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:statTab===k?700:400}}>{l}</button>
           )}
         </div>
 
@@ -1318,9 +1345,9 @@ function ShipmentsView({onBack,tgId,tgName,year,month,onMonthChange}) {
         </button>
 
         {firmNames.length>0&&<div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4}}>
-          <button onClick={()=>setFirmFilter('')} style={{whiteSpace:'nowrap',padding:'6px 12px',borderRadius:20,border:`1px solid ${!firmFilter?C.accent:C.border}`,background:!firmFilter?'rgba(56,189,248,0.1)':'transparent',color:!firmFilter?C.accent:C.dim,cursor:'pointer',fontSize:11,fontFamily:'inherit',flexShrink:0}}>Всі</button>
+          <button onClick={()=>setFirmFilter('')} style={{whiteSpace:'nowrap',padding:'6px 12px',borderRadius:20,border:`1px solid ${!firmFilter?C.accent:C.border}`,background:!firmFilter?'rgba(255,214,10,0.28)':'transparent',color:!firmFilter?C.accent:C.dim,cursor:'pointer',fontSize:11,fontFamily:'inherit',flexShrink:0}}>Всі</button>
           {firmNames.map(f=>(
-            <button key={f} onClick={()=>setFirmFilter(f===firmFilter?'':f)} style={{whiteSpace:'nowrap',padding:'6px 12px',borderRadius:20,border:`1px solid ${firmFilter===f?C.accent:C.border}`,background:firmFilter===f?'rgba(56,189,248,0.1)':'transparent',color:firmFilter===f?C.accent:C.dim,cursor:'pointer',fontSize:11,fontFamily:'inherit',flexShrink:0}}>{f}</button>
+            <button key={f} onClick={()=>setFirmFilter(f===firmFilter?'':f)} style={{whiteSpace:'nowrap',padding:'6px 12px',borderRadius:20,border:`1px solid ${firmFilter===f?C.accent:C.border}`,background:firmFilter===f?'rgba(255,214,10,0.28)':'transparent',color:firmFilter===f?C.accent:C.dim,cursor:'pointer',fontSize:11,fontFamily:'inherit',flexShrink:0}}>{f}</button>
           ))}
         </div>}
 
@@ -1364,7 +1391,7 @@ function ShipmentsView({onBack,tgId,tgName,year,month,onMonthChange}) {
         if (navigator.share) navigator.share({text:report}).catch(()=>{})
         else { navigator.clipboard?.writeText(report); alert('Скопійовано!') }
         vibrate('light')
-      }} style={{marginTop:12,width:'100%',background:C.accent,color:'#000',border:'none',borderRadius:10,padding:13,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+      }} style={{marginTop:12,width:'100%',background:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:13,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         Скопіювати / Поділитись
       </button>
     </Sheet>}
@@ -1437,14 +1464,14 @@ function IntakeForm({suppliers,editRow,onClose,onSaved,onRefsChanged,tgId,tgName
             <button key={w} type="button" onClick={()=>{vibrate('light');setWood(w)}}
               style={{flex:1,padding:'12px 4px',borderRadius:10,fontSize:13,fontFamily:'inherit',cursor:'pointer',fontWeight:wood===w?700:400,
                 border:`1px solid ${wood===w?C.accent:C.border}`,
-                background:wood===w?'rgba(56,189,248,0.12)':'transparent',
+                background:wood===w?'rgba(23,23,23,0.12)':'transparent',
                 color:wood===w?C.accent:C.dim}}>{w}</button>
           ))}
         </div>
       </div>
 
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
-      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.accent,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         {loading?'Збереження...':success?'✓ Збережено!':isEdit?'Зберегти зміни':'Зберегти прийом'}
       </button>
     </form>
@@ -1472,7 +1499,7 @@ function SuppliersManager({suppliers,onClose,onChanged}) {
   return <Sheet onClose={onClose} title="⚙️ Постачальники">
     <div style={{display:'flex',gap:6,marginBottom:14}}>
       <input value={newVal} onChange={e=>setNewVal(e.target.value)} placeholder="Новий постачальник..." style={{...inp,fontSize:13}}/>
-      <button onClick={handleAdd} disabled={busy} style={{background:C.green,border:'none',color:'#000',borderRadius:8,padding:'0 16px',fontSize:18,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>+</button>
+      <button onClick={handleAdd} disabled={busy} style={{background:C.green,border:'none',color:'#fff',borderRadius:8,padding:'0 16px',fontSize:18,fontWeight:700,cursor:'pointer',fontFamily:'inherit',flexShrink:0}}>+</button>
     </div>
     <div style={{display:'flex',flexDirection:'column',gap:6,maxHeight:'55vh',overflowY:'auto'}}>
       {suppliers.length===0&&<div style={{textAlign:'center',color:C.muted,fontSize:13,padding:20}}>Список порожній</div>}
@@ -1527,13 +1554,13 @@ function IntakeView({onBack,tgId,tgName,year,month,onMonthChange}) {
     <div style={{padding:'16px 16px 0',display:'flex',flexDirection:'column',gap:14}}>
       <MonthPicker year={year} month={month} onChange={(y,m)=>{onMonthChange(y,m);loadRows(y,m)}}/>
 
-      <button onClick={()=>setModal('new')} style={{background:C.accent,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+      <button onClick={()=>setModal('new')} style={{background:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         ➕ Новий прийом
       </button>
 
       <div style={{display:'flex',gap:8}}>
         {[['stats','📊 Статистика'],['list','📋 Прийоми']].map(([k,l])=>
-          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'10px',borderRadius:8,border:`1px solid ${tab===k?C.accent:C.border}`,background:tab===k?'rgba(56,189,248,0.1)':'transparent',color:tab===k?C.accent:C.dim,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:tab===k?700:400}}>{l}</button>
+          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'10px',borderRadius:8,border:`1px solid ${tab===k?C.accent:C.border}`,background:tab===k?'rgba(255,214,10,0.28)':'transparent',color:tab===k?C.accent:C.dim,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:tab===k?700:400}}>{l}</button>
         )}
       </div>
 
@@ -1549,7 +1576,7 @@ function IntakeView({onBack,tgId,tgName,year,month,onMonthChange}) {
 
         <div style={{display:'flex',gap:8}}>
           {[['wood','По лісу'],['supplier','По постачальниках']].map(([k,l])=>
-            <button key={k} onClick={()=>setStatTab(k)} style={{flex:1,padding:'9px',borderRadius:8,border:`1px solid ${statTab===k?C.gold:C.border}`,background:statTab===k?'rgba(245,158,11,0.1)':'transparent',color:statTab===k?C.gold:C.dim,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:statTab===k?700:400}}>{l}</button>
+            <button key={k} onClick={()=>setStatTab(k)} style={{flex:1,padding:'9px',borderRadius:8,border:`1px solid ${statTab===k?C.gold:C.border}`,background:statTab===k?'rgba(183,121,31,0.1)':'transparent',color:statTab===k?C.gold:C.dim,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:statTab===k?700:400}}>{l}</button>
           )}
         </div>
 
@@ -1586,9 +1613,9 @@ function IntakeView({onBack,tgId,tgName,year,month,onMonthChange}) {
         </button>
 
         {supNames.length>0&&<div style={{display:'flex',gap:6,overflowX:'auto',paddingBottom:4}}>
-          <button onClick={()=>setSupFilter('')} style={{whiteSpace:'nowrap',padding:'6px 12px',borderRadius:20,border:`1px solid ${!supFilter?C.accent:C.border}`,background:!supFilter?'rgba(56,189,248,0.1)':'transparent',color:!supFilter?C.accent:C.dim,cursor:'pointer',fontSize:11,fontFamily:'inherit',flexShrink:0}}>Всі</button>
+          <button onClick={()=>setSupFilter('')} style={{whiteSpace:'nowrap',padding:'6px 12px',borderRadius:20,border:`1px solid ${!supFilter?C.accent:C.border}`,background:!supFilter?'rgba(255,214,10,0.28)':'transparent',color:!supFilter?C.accent:C.dim,cursor:'pointer',fontSize:11,fontFamily:'inherit',flexShrink:0}}>Всі</button>
           {supNames.map(s=>(
-            <button key={s} onClick={()=>setSupFilter(s===supFilter?'':s)} style={{whiteSpace:'nowrap',padding:'6px 12px',borderRadius:20,border:`1px solid ${supFilter===s?C.accent:C.border}`,background:supFilter===s?'rgba(56,189,248,0.1)':'transparent',color:supFilter===s?C.accent:C.dim,cursor:'pointer',fontSize:11,fontFamily:'inherit',flexShrink:0}}>{s}</button>
+            <button key={s} onClick={()=>setSupFilter(s===supFilter?'':s)} style={{whiteSpace:'nowrap',padding:'6px 12px',borderRadius:20,border:`1px solid ${supFilter===s?C.accent:C.border}`,background:supFilter===s?'rgba(255,214,10,0.28)':'transparent',color:supFilter===s?C.accent:C.dim,cursor:'pointer',fontSize:11,fontFamily:'inherit',flexShrink:0}}>{s}</button>
           ))}
         </div>}
 
@@ -1625,14 +1652,14 @@ function IntakeView({onBack,tgId,tgName,year,month,onMonthChange}) {
         if (navigator.share) navigator.share({text:report}).catch(()=>{})
         else { navigator.clipboard?.writeText(report); alert('Скопійовано!') }
         vibrate('light')
-      }} style={{marginTop:12,width:'100%',background:C.accent,color:'#000',border:'none',borderRadius:10,padding:13,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+      }} style={{marginTop:12,width:'100%',background:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:13,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         Скопіювати / Поділитись
       </button>
     </Sheet>}
   </div>
 }
 
-const cubeBtn = {flex:1,padding:'10px 0',borderRadius:8,border:`1px solid rgba(56,189,248,0.3)`,background:'rgba(56,189,248,0.08)',color:'#38bdf8',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}
+const cubeBtn = {flex:1,padding:'10px 0',borderRadius:8,border:`1px solid rgba(23,23,23,0.3)`,background:'rgba(23,23,23,0.08)',color:'#38bdf8',fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}
 
 // ================================================================
 // ПАЛИВО
@@ -1672,7 +1699,7 @@ function FuelForm({editRow,onClose,onSaved,tgId,tgName}) {
             <button key={t} type="button" onClick={()=>{setFtype(t);setGrade('')}}
               style={{flex:1,padding:'12px 4px',borderRadius:10,fontSize:13,fontFamily:'inherit',cursor:'pointer',fontWeight:ftype===t?700:400,
                 border:`1px solid ${ftype===t?C.accent:C.border}`,
-                background:ftype===t?'rgba(56,189,248,0.12)':'transparent',
+                background:ftype===t?'rgba(23,23,23,0.12)':'transparent',
                 color:ftype===t?C.accent:C.dim}}>{t}</button>
           ))}
         </div>
@@ -1701,7 +1728,7 @@ function FuelForm({editRow,onClose,onSaved,tgId,tgName}) {
       </div>}
 
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
-      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.accent,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+      <button type="submit" disabled={loading||success} style={{background:success?C.green:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         {loading?'Збереження...':success?'✓ Збережено!':isEdit?'Зберегти зміни':'Зберегти'}
       </button>
     </form>
@@ -1735,13 +1762,13 @@ function FuelView({onBack,tgId,tgName,year,month,onMonthChange,isOwner}) {
     <div style={{padding:'16px 16px 0',display:'flex',flexDirection:'column',gap:14}}>
       <MonthPicker year={year} month={month} onChange={(y,m)=>{onMonthChange(y,m);loadRows(y,m)}}/>
 
-      <button onClick={()=>setModal('new')} style={{background:C.accent,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+      <button onClick={()=>setModal('new')} style={{background:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         ➕ Внести паливо
       </button>
 
       <div style={{display:'flex',gap:8}}>
         {[['stats','📊 Статистика'],['list','📋 Записи']].map(([k,l])=>
-          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'10px',borderRadius:8,border:`1px solid ${tab===k?C.accent:C.border}`,background:tab===k?'rgba(56,189,248,0.1)':'transparent',color:tab===k?C.accent:C.dim,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:tab===k?700:400}}>{l}</button>
+          <button key={k} onClick={()=>setTab(k)} style={{flex:1,padding:'10px',borderRadius:8,border:`1px solid ${tab===k?C.accent:C.border}`,background:tab===k?'rgba(255,214,10,0.28)':'transparent',color:tab===k?C.accent:C.dim,cursor:'pointer',fontSize:12,fontFamily:'inherit',fontWeight:tab===k?700:400}}>{l}</button>
         )}
       </div>
 
@@ -1858,7 +1885,7 @@ function ElectricityView({onBack,tgId,tgName,cfg}) {
             placeholder="напр. 12450" style={inp}/>
           <input type="date" value={newDate} max={todayStr()} onChange={e=>setNewDate(e.target.value)} style={inp}/>
           {error&&<div style={{color:C.red,fontSize:12}}>{error}</div>}
-          <button type="submit" disabled={saving} style={{background:C.accent,color:'#000',border:'none',borderRadius:10,padding:12,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
+          <button type="submit" disabled={saving} style={{background:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:12,fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
             {saving?'Збереження...':'Внести показник'}
           </button>
         </form>
@@ -1913,7 +1940,7 @@ function MonthlyStats({tgId,name,onBack}) {
             <CartesianGrid strokeDasharray="3 3" stroke={C.border2}/>
             <XAxis dataKey="month" stroke={C.muted} fontSize={10}/>
             <YAxis stroke={C.muted} fontSize={9} tickFormatter={v=>`${v/1000}к`}/>
-            <Tooltip formatter={v=>`${fmt(v)} грн`} contentStyle={{background:'#1a2535',border:`1px solid ${C.border}`,borderRadius:8,fontSize:11}}/>
+            <Tooltip formatter={v=>`${fmt(v)} грн`} contentStyle={{background:'#ffffff',border:`1px solid ${C.border}`,borderRadius:8,fontSize:11}}/>
             <Bar dataKey="earned" name="Заробіток" fill={C.accent} radius={[4,4,0,0]}/>
           </BarChart>
         </ResponsiveContainer>
@@ -1926,7 +1953,7 @@ function MonthlyStats({tgId,name,onBack}) {
             <CartesianGrid strokeDasharray="3 3" stroke={C.border2}/>
             <XAxis dataKey="month" stroke={C.muted} fontSize={10}/>
             <YAxis stroke={C.muted} fontSize={9}/>
-            <Tooltip formatter={v=>`${v} год`} contentStyle={{background:'#1a2535',border:`1px solid ${C.border}`,borderRadius:8,fontSize:11}}/>
+            <Tooltip formatter={v=>`${v} год`} contentStyle={{background:'#ffffff',border:`1px solid ${C.border}`,borderRadius:8,fontSize:11}}/>
             <Line type="monotone" dataKey="hours" name="Годин" stroke={C.gold} strokeWidth={2} dot={{fill:C.gold,r:3}}/>
           </LineChart>
         </ResponsiveContainer>
@@ -1979,7 +2006,7 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
 
     <div style={{padding:'16px 16px 0',display:'flex',flexDirection:'column',gap:14}}>
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-        <Card top={C.accent}><Lbl>До виплати</Lbl><div style={{fontSize:22,fontWeight:700,color:C.accent}}>{fmt(w.final)} ₴</div></Card>
+        <div style={{position:'relative',overflow:'hidden',background:C.ink,borderRadius:24,padding:'16px 18px',color:'#fff'}}><div style={{position:'absolute',right:-24,top:-24,width:84,height:84,borderRadius:'50%',background:C.yellow}}/><div style={{position:'relative',fontSize:10,letterSpacing:2,opacity:.65,textTransform:'uppercase'}}>До виплати</div><div style={{position:'relative',fontSize:24,fontWeight:800,marginTop:2}}>{fmt(w.final)} ₴</div></div>
         <Card top={C.green}><Lbl>Нараховано</Lbl><div style={{fontSize:18,fontWeight:700,color:C.green}}>{fmt(w.gross)} ₴</div></Card>
       </div>
 
@@ -2002,14 +2029,14 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
 
       {/* Кнопки */}
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-        {w.type==='shift'&&<button onClick={()=>setModal('shift')} style={{background:'rgba(56,189,248,0.1)',border:`1px solid ${C.accent}`,color:C.accent,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⏱ Зміна</button>}
-        {isOwner&&<button onClick={()=>setModal('bonus')} style={{background:'rgba(245,158,11,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>🏆 Премія</button>}
+        {w.type==='shift'&&<button onClick={()=>setModal('shift')} style={{background:'rgba(255,214,10,0.28)',border:`1px solid ${C.accent}`,color:C.accent,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⏱ Зміна</button>}
+        {isOwner&&<button onClick={()=>setModal('bonus')} style={{background:'rgba(183,121,31,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>🏆 Премія</button>}
         {isOwner&&<button onClick={()=>setModal('fine')} style={{background:`${C.red}11`,border:`1px solid ${C.red}`,color:C.red,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>🚫 Штраф</button>}
-        <button onClick={()=>setModal('advance')} style={{background:'rgba(245,158,11,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>💵 Аванс</button>
+        <button onClick={()=>setModal('advance')} style={{background:'rgba(183,121,31,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>💵 Аванс</button>
         {isOwner&&<button onClick={()=>setModal('debt')} style={{background:`${C.red}11`,border:`1px solid ${C.red}33`,color:C.red,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⚠️ Борг</button>}
         {w.debtRemaining>0&&<button onClick={()=>setModal('debtpay')} style={{background:`${C.red}11`,border:`1px solid ${C.red}`,color:C.red,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>💸 Виплата боргу</button>}
         <button onClick={()=>setShowStats(true)} style={{background:'rgba(167,139,250,0.1)',border:`1px solid ${C.purple}`,color:C.purple,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>📊 Статистика</button>
-        <button onClick={()=>setPayslip(true)} style={{background:'rgba(34,197,94,0.1)',border:`1px solid ${C.green}`,color:C.green,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>📄 Листок</button>
+        <button onClick={()=>setPayslip(true)} style={{background:'rgba(21,128,61,0.1)',border:`1px solid ${C.green}`,color:C.green,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>📄 Листок</button>
       </div>
 
       {w.type==='shift'&&<>
@@ -2020,7 +2047,7 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
               <CartesianGrid strokeDasharray="3 3" stroke={C.border2}/>
               <XAxis dataKey="day" stroke={C.muted} fontSize={9}/>
               <YAxis stroke={C.muted} fontSize={9} domain={[0,14]}/>
-              <Tooltip formatter={v=>`${v} год`} contentStyle={{background:'#1a2535',border:`1px solid ${C.border}`,borderRadius:8,fontSize:11}}/>
+              <Tooltip formatter={v=>`${v} год`} contentStyle={{background:'#ffffff',border:`1px solid ${C.border}`,borderRadius:8,fontSize:11}}/>
               <Bar dataKey="normal" name="Год." stackId="a" fill={C.accent}/>
               <Bar dataKey="long" name="10+" stackId="a" fill={C.gold} radius={[3,3,0,0]}/>
             </BarChart>
@@ -2120,6 +2147,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
   const totalFOP   = workers.reduce((s,w)=>s+(w.final||0),0)
   const totalGross = workers.reduce((s,w)=>s+(w.gross||0),0)
   const alertWorkers = workers.filter(w=>w.type==='shift'&&w.daysSinceEntry>=2)
+  const totalFinesAll = workers.reduce((s,w)=>s+(w.totalFines||0),0)
   const filtered = search ? workers.filter(w=>w.name.toLowerCase().includes(search.toLowerCase())) : workers
 
   const chart = workers.map((w,i)=>({
@@ -2129,13 +2157,14 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
   }))
 
   if (view==='debts') return <DebtsView workers={workers} onBack={()=>setView('main')} onRefresh={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>
+  if (view==='fines') return <FinesView workers={workers} month={month} year={year} onBack={()=>setView('main')} onRefresh={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>
   if (view==='shipments') return <ShipmentsView onBack={()=>setView('main')} tgId={tgId} tgName={tgName} year={year} month={month} onMonthChange={onMonthChange}/>
   if (view==='intake') return <IntakeView onBack={()=>setView('main')} tgId={tgId} tgName={tgName} year={year} month={month} onMonthChange={onMonthChange}/>
   if (view==='fuel') return <FuelView onBack={()=>setView('main')} tgId={tgId} tgName={tgName} year={year} month={month} onMonthChange={onMonthChange} isOwner={true}/>
   if (view==='electricity') return <ElectricityView onBack={()=>setView('main')} tgId={tgId} tgName={tgName} cfg={cfg}/>
   if (detail) return <WorkerDetail w={detail} allWorkers={workers} isOwner onBack={()=>setDetail(null)} onRefresh={()=>{setDetail(null);onRefresh(year,month)}} tgId={tgId} tgName={tgName} cfg={cfg} month={month} year={year}/>
 
-  return <div style={{minHeight:'100vh',background:C.bg,paddingBottom:40}}>
+  return <div style={{minHeight:'100vh',background:C.bg,paddingBottom:90}}>
     <Header title="🪵 ПИЛОРАМА" sub={`${MONTHS_UA[month]} ${year}`} onRefresh={()=>onRefresh(year,month)}
       right={<button onClick={()=>setModal('settings')} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.purple,borderRadius:8,padding:'6px 10px',fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>⚙️</button>}/>
 
@@ -2146,23 +2175,28 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
         ⚠ Не вносили 2+ дні: {alertWorkers.map(w=>w.name.split(' ')[0]).join(', ')}
       </div>}
 
+      <div style={{position:'relative',overflow:'hidden',background:C.ink,borderRadius:28,padding:'22px 22px 20px',color:'#fff'}}>
+        <div style={{position:'absolute',right:-34,top:-34,width:130,height:130,borderRadius:'50%',background:C.yellow}}/>
+        <div style={{position:'relative',fontSize:11,letterSpacing:2,opacity:.65,textTransform:'uppercase'}}>До виплати · {MONTHS_UA[month]}</div>
+        <div style={{position:'relative',fontSize:34,fontWeight:800,marginTop:4}}>{fmt(totalFOP)} ₴</div>
+        <div style={{position:'relative',fontSize:12,opacity:.65,marginTop:4}}>Нараховано {fmt(totalGross)} ₴{totalFinesAll>0?` · штрафи −${fmt(totalFinesAll)} ₴`:''}</div>
+      </div>
+
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-        <Card top={C.accent}><Lbl>До виплати</Lbl><div style={{fontSize:20,fontWeight:700,color:C.accent}}>{fmt(totalFOP)} ₴</div></Card>
-        <Card top={C.green}><Lbl>Нараховано</Lbl><div style={{fontSize:18,fontWeight:700,color:C.green}}>{fmt(totalGross)} ₴</div></Card>
+        {[
+          ['shift','⏱','Зміна',true],['bonus','🏆','Премія',false],
+          ['fine','🚫','Штраф',false],['addworker','➕','Додати',false],
+        ].map(([k,ic,lb,y])=><button key={k} onClick={()=>setModal(k)} style={{background:y?C.yellow:C.surface,color:k==='fine'?C.red:C.ink,border:k==='fine'?`2px solid ${C.red}`:'none',borderRadius:20,padding:'16px 14px',fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',textAlign:'left',display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:20}}>{ic}</span>{lb}
+        </button>)}
       </div>
 
-      <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6}}>
-        <button onClick={()=>setModal('shift')} style={{background:'rgba(56,189,248,0.1)',border:`1px solid ${C.accent}`,color:C.accent,borderRadius:10,padding:'10px 4px',fontSize:11,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⏱ Зміна</button>
-        <button onClick={()=>setModal('bonus')} style={{background:'rgba(245,158,11,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'10px 4px',fontSize:11,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>🏆 Премія</button>
-        <button onClick={()=>setModal('fine')} style={{background:`${C.red}11`,border:`1px solid ${C.red}`,color:C.red,borderRadius:10,padding:'10px 2px',fontSize:10,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>🚫 Штраф</button>
-        <button onClick={()=>setView('debts')} style={{background:`${C.red}11`,border:`1px solid ${C.red}33`,color:C.red,borderRadius:10,padding:'10px 4px',fontSize:11,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>💸 Борги</button>
-        <button onClick={()=>setModal('addworker')} style={{background:'rgba(34,197,94,0.1)',border:`1px solid ${C.green}`,color:C.green,borderRadius:10,padding:'10px 4px',fontSize:11,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>➕ Додати</button>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        {[['shipments','📦','Відправки'],['intake','🌲','Сировина'],['fuel','⛽','Паливо'],['electricity','💡','Світло']].map(([k,ic,lb])=>
+          <button key={k} onClick={()=>setView(k)} style={{background:C.surface,color:C.ink,border:`1px solid ${C.border}`,borderRadius:20,padding:'14px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',textAlign:'left',display:'flex',alignItems:'center',gap:10}}>
+            <span style={{fontSize:18}}>{ic}</span>{lb}
+          </button>)}
       </div>
-
-      <button onClick={()=>setView('shipments')} style={{background:'rgba(56,189,248,0.1)',border:`1px solid ${C.accent}`,color:C.accent,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>📦 Облік відправок</button>
-      <button onClick={()=>setView('intake')} style={{background:'rgba(34,197,94,0.1)',border:`1px solid ${C.green}`,color:C.green,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>🌲 Прийом сировини</button>
-      <button onClick={()=>setView('fuel')} style={{background:'rgba(245,158,11,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⛽ Паливо</button>
-      <button onClick={()=>setView('electricity')} style={{background:'rgba(251,191,36,0.08)',border:`1px solid #fbbf24`,color:'#fbbf24',borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>💡 Показники світла</button>
 
       <Card>
         <SecTitle>НАРАХУВАННЯ</SecTitle>
@@ -2172,8 +2206,8 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
             <XAxis dataKey="name" stroke={C.muted} fontSize={10}/>
             <YAxis stroke={C.muted} fontSize={9} tickFormatter={v=>`${v/1000}к`}/>
             <Tooltip content={<TTip/>}/>
-            <Bar dataKey="base" name="Ставка" stackId="a" fill={C.accent}/>
-            <Bar dataKey="bonus" name="Бонуси" stackId="a" fill={C.gold} radius={[3,3,0,0]}/>
+            <Bar dataKey="base" name="Ставка" stackId="a" fill={C.ink}/>
+            <Bar dataKey="bonus" name="Бонуси" stackId="a" fill={C.yellow} radius={[3,3,0,0]}/>
           </BarChart>
         </ResponsiveContainer>
       </Card>
@@ -2182,7 +2216,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
         <SecTitle>ПЕРСОНАЛ</SecTitle>
         {/* Пошук */}
         <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Пошук працівника..." style={{...inp,marginBottom:12,fontSize:13}}/>
-        {filtered.map((w,i)=><button key={w.tgId||i} onClick={()=>setDetail(w)} style={{width:'100%',background:'rgba(255,255,255,0.02)',border:`1px solid ${w.daysSinceEntry>=2&&w.type==='shift'?C.red:C.border}`,borderRadius:10,padding:'12px 14px',marginBottom:8,cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
+        {filtered.map((w,i)=><button key={w.tgId||i} onClick={()=>setDetail(w)} style={{width:'100%',background:'#fff',border:`1px solid ${w.daysSinceEntry>=2&&w.type==='shift'?C.red:C.border}`,borderRadius:10,padding:'12px 14px',marginBottom:8,cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
           <div style={{display:'flex',justifyContent:'space-between',marginBottom:w.type==='shift'?6:0}}>
             <div>
               <span style={{color:C.w[i%C.w.length],fontWeight:600,fontSize:13}}>{w.name}</span>
@@ -2204,6 +2238,10 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
       </Card>
     </div>
 
+    <div style={{position:'fixed',left:'50%',transform:'translateX(-50%)',bottom:14,background:C.ink,borderRadius:30,padding:6,display:'flex',gap:4,zIndex:50,boxShadow:'0 8px 24px rgba(0,0,0,.25)'}}>
+      {[['main','Головна'],['fines','Штрафи'],['debts','Борги']].map(([k,l])=>
+        <button key={k} onClick={()=>setView(k)} style={{background:view===k?C.yellow:'transparent',color:view===k?C.ink:'#fff',border:'none',borderRadius:24,padding:'10px 18px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{l}</button>)}
+    </div>
     {modal==='shift'    &&<ShiftForm worker={workers[0]||{}} allWorkers={workers} isOwner onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName} cfg={cfg}/>}
     {modal==='bonus'    &&<BonusForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
     {modal==='fine'     &&<FineForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
@@ -2245,7 +2283,7 @@ function WorkerView({tgId,data,onRefresh}) {
       <MonthPicker year={year} month={month} onChange={(y,m)=>{setYear(y);setMonth(m);onRefresh(y,m)}}/>
 
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-        <Card top={C.accent}><Lbl>До виплати</Lbl><div style={{fontSize:22,fontWeight:700,color:C.accent}}>{fmt(w.final)} ₴</div></Card>
+        <div style={{position:'relative',overflow:'hidden',background:C.ink,borderRadius:24,padding:'16px 18px',color:'#fff'}}><div style={{position:'absolute',right:-24,top:-24,width:84,height:84,borderRadius:'50%',background:C.yellow}}/><div style={{position:'relative',fontSize:10,letterSpacing:2,opacity:.65,textTransform:'uppercase'}}>До виплати</div><div style={{position:'relative',fontSize:24,fontWeight:800,marginTop:2}}>{fmt(w.final)} ₴</div></div>
         <Card top={C.green}><Lbl>Нараховано</Lbl><div style={{fontSize:18,fontWeight:700,color:C.green}}>{fmt(w.gross)} ₴</div></Card>
       </div>
 
@@ -2265,7 +2303,7 @@ function WorkerView({tgId,data,onRefresh}) {
       <Card>
         <SecTitle>МОЇ СТАВКИ</SecTitle>
         <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-          <div style={{background:'rgba(56,189,248,0.06)',borderRadius:8,padding:'10px 12px'}}>
+          <div style={{background:'rgba(23,23,23,0.06)',borderRadius:8,padding:'10px 12px'}}>
             <div style={{fontSize:10,color:C.muted,marginBottom:4}}>ЗА ГОДИНУ</div>
             <div style={{fontSize:20,fontWeight:700,color:C.accent}}>{w.rateHour||'—'}</div>
             <div style={{fontSize:10,color:C.muted}}>грн</div>
@@ -2279,13 +2317,13 @@ function WorkerView({tgId,data,onRefresh}) {
       </Card>
 
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-        <button onClick={()=>setModal('shift')} style={{background:'rgba(56,189,248,0.1)',border:`1px solid ${C.accent}`,color:C.accent,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⏱ Внести зміну</button>
-        <button onClick={()=>setModal('advance')} style={{background:'rgba(245,158,11,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>💵 Аванс</button>
+        <button onClick={()=>setModal('shift')} style={{background:'rgba(255,214,10,0.28)',border:`1px solid ${C.accent}`,color:C.accent,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⏱ Внести зміну</button>
+        <button onClick={()=>setModal('advance')} style={{background:'rgba(183,121,31,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>💵 Аванс</button>
         <button onClick={()=>setShowStats(true)} style={{background:'rgba(167,139,250,0.1)',border:`1px solid ${C.purple}`,color:C.purple,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>📊 Статистика</button>
-        <button onClick={()=>setShowPayslip(true)} style={{background:'rgba(34,197,94,0.1)',border:`1px solid ${C.green}`,color:C.green,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>📄 Листок</button>
+        <button onClick={()=>setShowPayslip(true)} style={{background:'rgba(21,128,61,0.1)',border:`1px solid ${C.green}`,color:C.green,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>📄 Листок</button>
       </div>
 
-      {w.fuelAccess&&<button onClick={()=>setView('fuel')} style={{width:'100%',background:'rgba(245,158,11,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⛽ Внести паливо</button>}
+      {w.fuelAccess&&<button onClick={()=>setView('fuel')} style={{width:'100%',background:'rgba(183,121,31,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⛽ Внести паливо</button>}
 
       {hoursChart.length>0&&<Card>
         <SecTitle>ГОДИНИ ПО ДНЯХ ⭐=10+</SecTitle>
@@ -2294,7 +2332,7 @@ function WorkerView({tgId,data,onRefresh}) {
             <CartesianGrid strokeDasharray="3 3" stroke={C.border2}/>
             <XAxis dataKey="day" stroke={C.muted} fontSize={9}/>
             <YAxis stroke={C.muted} fontSize={9} domain={[0,14]}/>
-            <Tooltip formatter={v=>`${v} год`} contentStyle={{background:'#1a2535',border:`1px solid ${C.border}`,borderRadius:8,fontSize:11}}/>
+            <Tooltip formatter={v=>`${v} год`} contentStyle={{background:'#ffffff',border:`1px solid ${C.border}`,borderRadius:8,fontSize:11}}/>
             <Bar dataKey="normal" name="Год." stackId="a" fill={C.accent}/>
             <Bar dataKey="long" name="10+" stackId="a" fill={C.gold} radius={[3,3,0,0]}/>
           </BarChart>
@@ -2417,7 +2455,7 @@ export default function App() {
       <div style={{fontSize:36}}>⚠️</div>
       <div style={{color:C.red,fontSize:14,fontWeight:700}}>Помилка підключення</div>
       <div style={{color:C.dim,fontSize:12,textAlign:'center',maxWidth:300,lineHeight:1.6}}>{error}</div>
-      <button onClick={()=>load()} style={{background:C.accent,color:'#000',border:'none',borderRadius:8,padding:'10px 24px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>Спробувати знову</button>
+      <button onClick={()=>load()} style={{background:C.yellow,color:C.ink,border:'none',borderRadius:8,padding:'10px 24px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>Спробувати знову</button>
     </div>
   )
 
@@ -2426,7 +2464,7 @@ export default function App() {
       <div style={{fontSize:48}}>🔒</div>
       <div style={{color:C.red,fontSize:15,fontWeight:700}}>Доступ закрито</div>
       <div style={{color:C.dim,fontSize:13,textAlign:'center',maxWidth:280,lineHeight:1.7}}>Тебе ще не додано до системи.<br/>Зверніться до власника.</div>
-      {tgId&&<div style={{background:'rgba(56,189,248,0.06)',border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 16px',fontSize:11,color:C.muted,textAlign:'center'}}>
+      {tgId&&<div style={{background:'rgba(23,23,23,0.06)',border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 16px',fontSize:11,color:C.muted,textAlign:'center'}}>
         Твій Telegram ID:<br/><span style={{color:C.accent,fontSize:15,fontWeight:700}}>{tgId}</span><br/>
         <span style={{fontSize:10}}>(надішли власнику)</span>
       </div>}
