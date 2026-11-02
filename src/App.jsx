@@ -2235,7 +2235,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
       </Card>
       </>}
 
-      {tab==='people'&&<>
+      {(tab==='people'||tab==='home')&&<>
       <div style={{fontSize:16,fontWeight:800,marginTop:4}}>Персонал</div>
       <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Пошук працівника..." style={{...inp,background:C.surface,border:'none',borderRadius:16,fontSize:14,padding:'13px 16px'}}/>
       {filtered.map((w,i)=>{
