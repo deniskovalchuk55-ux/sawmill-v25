@@ -5,6 +5,7 @@ const DB = {
   staff:        import.meta.env.VITE_DB_STAFF,
   advances:     import.meta.env.VITE_DB_ADVANCES,
   bonuses:      import.meta.env.VITE_DB_BONUSES,
+  fines:        import.meta.env.VITE_DB_FINES,
   fixedStaff:   import.meta.env.VITE_DB_FIXED_STAFF,
   debts:        import.meta.env.VITE_DB_DEBTS,
   debtPayments: import.meta.env.VITE_DB_DEBT_PAYMENTS,
@@ -124,7 +125,7 @@ export async function saveSettings(pageId, cfg) {
 
 export async function fetchAllData(year, month) {
   const df = f => dateFilter(f, year, month)
-  const [shifts, staff, advances, bonuses, fixedStaff, debts, debtPayments, settings] =
+  const [shifts, staff, advances, bonuses, fixedStaff, debts, debtPayments, settings, fines] =
     await Promise.all([
       queryDB(DB.shifts,       df('Дата')),
       queryDB(DB.staff),
@@ -134,12 +135,14 @@ export async function fetchAllData(year, month) {
       queryDB(DB.debts),
       queryDB(DB.debtPayments, df('Дата')),
       fetchSettings(),
+      DB.fines ? queryDB(DB.fines, df('Дата')) : Promise.resolve({results:[]}),
     ])
   return {
     shifts:       shifts.results.map(parseShift),
     staff:        staff.results.map(parseStaff),
     advances:     advances.results.map(parseAdvance),
     bonuses:      bonuses.results.map(parseBonus),
+    fines:        fines.results.map(parseFine),
     fixedStaff:   fixedStaff.results.map(parseFixed),
     debts:        debts.results.map(parseDebt),
     debtPayments: debtPayments.results.map(parseDP),
@@ -187,6 +190,10 @@ function parseStaff(r) {
     rateHour:p.num(q['Ставка в годину']), ratePack:p.num(q['Ставка за пачку']),
     bonusOff:p.bool(q['Бонуси вимкнено']), premiumOff:p.bool(q['Премії вимкнено']),
     fuelAccess:p.bool(q['Доступ до палива']),
+    lowRateOn:   p.bool(q['Знижена ставка вкл']),
+    lowRateDays: p.numN(q['Поріг днів (знижена)']),
+    rateHourLow: p.numN(q['Ставка в годину (знижена)']),
+    ratePackLow: p.numN(q['Ставка за пачку (знижена)']),
     ind: {
       minDaysForBonus: p.numN(q['Мін днів бонус']),
       bonusPerLongDay: p.numN(q['Бонус за довгий день']),
@@ -206,6 +213,11 @@ function parseBonus(r) {
   const q = r.properties
   return { id:r.id, tgId:p.num(q['ID']), name:p.text(q['ПІБ']), date:p.date(q['Дата']),
     amount:p.num(q['Сума премії']), reason:p.text(q['Причина']) }
+}
+function parseFine(r) {
+  const q = r.properties
+  return { id:r.id, tgId:p.num(q['ID']), name:p.text(q['ПІБ']), date:p.date(q['Дата']),
+    amount:p.num(q['Сума штрафу']), reason:p.text(q['Причина']) }
 }
 function parseFixed(r) {
   const q = r.properties
@@ -258,17 +270,18 @@ export async function deleteWorkerCompletely(tgId, staffPageId) {
     property: 'ID', number: { equals: Number(tgId) },
   }
 
-  const [shiftsR, advR, bonusR, debtR, debtPayR] = await Promise.all([
+  const [shiftsR, advR, bonusR, debtR, debtPayR, fineR] = await Promise.all([
     queryDB(DB.shifts,       filterByTg),
     queryDB(DB.advances,     filterByTg),
     queryDB(DB.bonuses,      filterByTg),
     queryDB(DB.debts,        filterByTg),
     queryDB(DB.debtPayments, filterByTg),
+    DB.fines ? queryDB(DB.fines, filterByTg) : Promise.resolve({results:[]}),
   ])
 
   const allIds = [
     ...shiftsR.results, ...advR.results, ...bonusR.results,
-    ...debtR.results, ...debtPayR.results,
+    ...debtR.results, ...debtPayR.results, ...fineR.results,
   ].map(r => r.id)
 
   for (const id of allIds) { await archivePage(id) }
@@ -284,6 +297,17 @@ export async function saveBonusRecord({ tgId, name, date, amount, reason }) {
     'Дата':        { date:{ start:date } },
     'Сума премії': { number:amount },
     'Причина':     { rich_text:[{ text:{ content:reason||'' } }] },
+  })
+}
+
+export async function saveFine({ tgId, name, date, amount, reason }) {
+  if (!DB.fines) throw new Error('Не задано VITE_DB_FINES')
+  return createPage(DB.fines, {
+    'ПІБ':          { title:[{ text:{ content:name } }] },
+    'ID':           { number:tgId },
+    'Дата':         { date:{ start:date } },
+    'Сума штрафу':  { number:amount },
+    'Причина':      { rich_text:[{ text:{ content:reason||'' } }] },
   })
 }
 
@@ -362,11 +386,19 @@ export async function updateStaffInfo(pageId, { name, tgId }) {
 }
 
 // Тумблери бонусів / премій + індивідуальні налаштування + доступ до палива
-export async function updateStaffToggles(pageId, { bonusOff, premiumOff, ind, fuelAccess }) {
+export async function updateStaffToggles(pageId, { bonusOff, premiumOff, ind, fuelAccess, lowRateOn, lowRateDays, rateHourLow, ratePackLow }) {
   const props = {}
   if (bonusOff   !== undefined) props['Бонуси вимкнено'] = { checkbox: bonusOff }
   if (premiumOff !== undefined) props['Премії вимкнено'] = { checkbox: premiumOff }
   if (fuelAccess !== undefined) props['Доступ до палива'] = { checkbox: fuelAccess }
+  if (lowRateOn  !== undefined) props['Знижена ставка вкл'] = { checkbox: lowRateOn }
+  const setNumTop = (key, val) => {
+    if (val === '' || val === null || val === undefined) props[key] = { number: null }
+    else props[key] = { number: Number(val) }
+  }
+  if (lowRateDays !== undefined) setNumTop('Поріг днів (знижена)', lowRateDays)
+  if (rateHourLow !== undefined) setNumTop('Ставка в годину (знижена)', rateHourLow)
+  if (ratePackLow !== undefined) setNumTop('Ставка за пачку (знижена)', ratePackLow)
   if (ind) {
     // null/'' → очистити поле (буде загальне), число → індивідуальне
     const setNum = (key, val) => {
@@ -381,7 +413,19 @@ export async function updateStaffToggles(pageId, { bonusOff, premiumOff, ind, fu
     setNum('Годин довгий день',      ind.longDayHours)
     setNum('Потрібно довгих днів',   ind.longDaysNeeded)
   }
-  return updatePage(pageId, props)
+  try {
+    return await updatePage(pageId, props)
+  } catch (e) {
+    // Нові колонки (паливо / знижена ставка) ще можуть бути відсутні в Notion —
+    // тоді зберігаємо решту й чітко кажемо, чого не вистачає.
+    const optional = ['Доступ до палива','Знижена ставка вкл','Поріг днів (знижена)','Ставка в годину (знижена)','Ставка за пачку (знижена)']
+    const missing = optional.filter(k => k in props && String(e.message).includes(k))
+    if (!missing.length) throw e
+    const rest = { ...props }
+    optional.forEach(k => delete rest[k])
+    if (Object.keys(rest).length) await updatePage(pageId, rest)
+    throw new Error(`Збережено, але в Notion (Персонал) немає колонок: ${missing.join(', ')}. Додай їх і збережи ще раз.`)
+  }
 }
 
 export async function deleteStaff(pageId) { return archivePage(pageId) }
@@ -676,6 +720,7 @@ function isSun(d) { return new Date(d).getDay()===0 }
 
 export function calcSalary(tgId, data) {
   const { shifts, staff, advances, bonuses, debts, debtPayments, cfg } = data
+  const fines = data.fines || []
   const si = staff.find(s=>s.tgId===tgId)||{}
   const myShifts = shifts.filter(s=>s.tgId===tgId)
 
@@ -699,8 +744,14 @@ export function calcSalary(tgId, data) {
 
   // Поточна ставка з картки працівника має пріоритет.
   // Ставка зі зміни — лише запасний варіант для працівників без картки в «Персонал».
-  const rateHour = si.rateHour||myShifts[0]?.rateHour||0
-  const ratePack = si.ratePack||myShifts[0]?.ratePack||0
+  // Якщо увімкнена «знижена ставка» і робочих днів менше порогу — застосовуємо знижену.
+  const useLowRate = si.lowRateOn && workDays < (si.lowRateDays??19)
+  const rateHour = useLowRate
+    ? (si.rateHourLow??si.rateHour??myShifts[0]?.rateHour??0)
+    : (si.rateHour||myShifts[0]?.rateHour||0)
+  const ratePack = useLowRate
+    ? (si.ratePackLow??si.ratePack??myShifts[0]?.ratePack??0)
+    : (si.ratePack||myShifts[0]?.ratePack||0)
 
   // Тумблери — індивідуальне вимкнення
   const bonusOff   = si.bonusOff||false
@@ -728,20 +779,25 @@ export function calcSalary(tgId, data) {
   const premium     = (!premiumOff && workDays>=ePremDays) ? ePremAmt : 0
   const manualBonus = bonuses.filter(b=>b.tgId===tgId).reduce((s,b)=>s+b.amount,0)
   const totalAdv    = advances.filter(a=>a.tgId===tgId).reduce((s,a)=>s+a.amount,0)
+  const totalFines  = fines.filter(f=>f.tgId===tgId).reduce((s,f)=>s+f.amount,0)
   const debtPaid    = debtPayments.filter(p=>p.tgId===tgId).reduce((s,p)=>s+p.amount,0)
   const debtInfo    = debts.find(d=>d.tgId===tgId)
   const gross       = base+bonusLong+bonusSat+premium+manualBonus
-  const final       = gross-totalAdv-debtPaid
+  const final       = gross-totalAdv-debtPaid-totalFines
   const lastEntry   = days.length ? days[days.length-1].date : null
   const daysSinceEntry = lastEntry ? Math.floor((new Date()-new Date(lastEntry))/(864e5)) : 99
 
   return {
     tgId, name:si.name||'', rateHour, ratePack, staffPageId:si.id,
+    lowRateOn:si.lowRateOn||false, lowRateDays:si.lowRateDays??19,
+    rateHourLow:si.rateHourLow??null, ratePackLow:si.ratePackLow??null,
+    lowRateApplied:useLowRate,
     bonusOff, premiumOff, ind, fuelAccess:si.fuelAccess||false,
     totalHours, totalPacks, workDays, longDays:longDaysCalc, saturdays, days,
     earnHours, earnPacks, base, bonusActive,
     bonusLong, bonusSat, premium, manualBonus, gross,
-    totalAdv, debtPaid,
+    totalAdv, debtPaid, totalFines,
+    fines: fines.filter(f=>f.tgId===tgId),
     debtRemaining: debtInfo?.remaining||0,
     debtPageId: debtInfo?.id||null,
     final,
@@ -769,11 +825,13 @@ export function calcAllWorkers(data) {
   const fixedWorkers = data.fixedStaff.map(w => {
     const totalAdv = data.advances.filter(a=>a.tgId===w.tgId).reduce((s,a)=>s+a.amount,0)
     const debtPaid = data.debtPayments.filter(p=>p.tgId===w.tgId).reduce((s,p)=>s+p.amount,0)
+    const fines = (data.fines||[]).filter(f=>f.tgId===w.tgId)
+    const totalFines = fines.reduce((s,f)=>s+f.amount,0)
     const debtInfo = data.debts.find(d=>d.tgId===w.tgId)
     return {
       type:'fixed', tgId:w.tgId, name:w.name, role:w.role, staffPageId:w.id,
-      gross:w.salary, final:w.salary-totalAdv-debtPaid,
-      totalAdv, debtPaid,
+      gross:w.salary, final:w.salary-totalAdv-debtPaid-totalFines,
+      totalAdv, debtPaid, totalFines, fines,
       debtRemaining: debtInfo?.remaining||0,
       debtPageId: debtInfo?.id||null,
       bonusOff:false, premiumOff:false,

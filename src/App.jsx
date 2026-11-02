@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { fetchAllData, fetchMonthlyStats,
-         calcAllWorkers, calcSalary, saveShift, updateShift, deleteShift, saveBonusRecord,
+         calcAllWorkers, calcSalary, saveShift, updateShift, deleteShift, saveBonusRecord, saveFine,
          saveAdvance, saveDebtPayment, addDebt, addStaff, addFixedStaff,
          updateStaffRates, updateFixedSalary, updateStaffInfo, deleteStaff, deleteWorkerCompletely,
          updateStaffToggles, saveSettings, checkAccess, writeLog, DEFAULT_CFG,
@@ -183,6 +183,7 @@ function PayslipModal({w,month,year,onClose}) {
     `━━━━━━━━━━━━━━━`,
     `📊 Нараховано: ${fmt(w.gross)} грн`,
     w.totalAdv>0?`➖ Аванси: -${fmt(w.totalAdv)} грн`:'',
+    w.totalFines>0?`🚫 Штрафи: -${fmt(w.totalFines)} грн`:'',
     w.debtPaid>0?`➖ Борг: -${fmt(w.debtPaid)} грн`:'',
     `━━━━━━━━━━━━━━━`,
     `✅ ДО ВИПЛАТИ: ${fmt(w.final)} грн`,
@@ -473,6 +474,63 @@ function AdvanceForm({worker,allWorkers,isOwner,onClose,onSaved,tgId,tgName}) {
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
       <button type="submit" disabled={loading||success} style={{background:success?C.green:C.gold,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         {loading?'Збереження...':success?'✓ Збережено!':'Видати аванс'}
+      </button>
+    </form>
+  </Sheet>
+}
+
+// ================================================================
+// ФОРМА ШТРАФУ
+// ================================================================
+function FineForm({worker,allWorkers,onClose,onSaved,tgId,tgName}) {
+  const [selId,   setSelId]   = useState(worker?.tgId)
+  const [date,    setDate]    = useState(todayStr())
+  const [amount,  setAmount]  = useState(0)
+  const [reason,  setReason]  = useState('')
+  const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState(false)
+  const [error,   setError]   = useState(null)
+  const sel = allWorkers.find(w=>w.tgId===Number(selId))||worker
+  const addAmount = (a) => { vibrate('light'); setAmount(prev => (Number(prev)||0) + a) }
+
+  async function submit(e) {
+    e.preventDefault()
+    if (!amount) return
+    try {
+      setLoading(true); setError(null)
+      await saveFine({tgId:sel.tgId,name:sel.name,date,amount:Number(amount),reason})
+      await writeLog({tgId,name:tgName,action:`Штраф: ${sel.name}`,details:`${fmt(amount)} грн · ${reason}`})
+      vibrate('medium')
+      setSuccess(true)
+      setTimeout(()=>{onSaved();onClose()},1400)
+    } catch(e){setError(e.message)} finally{setLoading(false)}
+  }
+
+  return <Sheet onClose={onClose} title="🚫 Штраф">
+    <form onSubmit={submit} style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div><Lbl>РОБІТНИК</Lbl>
+        <select value={selId} onChange={e=>setSelId(e.target.value)} style={{...inp,cursor:'pointer'}}>
+          {allWorkers.map(w=><option key={w.tgId} value={w.tgId}>{w.name}</option>)}
+        </select></div>
+      <div><Lbl>ДАТА</Lbl><input type="date" value={date} max={todayStr()} onChange={e=>setDate(e.target.value)} style={inp}/></div>
+      <div>
+        <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
+          <Lbl>СУМА (натискай — плюсується!)</Lbl>
+          {amount>0&&<button type="button" onClick={()=>setAmount(0)} style={{background:'transparent',border:'none',color:C.red,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>Скинути</button>}
+        </div>
+        <div style={{display:'flex',gap:8,marginBottom:10}}>
+          {[100,200,500,1000].map(a=><button key={a} type="button" onClick={()=>addAmount(a)} style={{flex:1,padding:'8px 0',borderRadius:8,border:`1px solid ${C.red}`,background:`${C.red}15`,color:C.red,fontSize:12,cursor:'pointer',fontFamily:'inherit',fontWeight:600}}>+{a}</button>)}
+        </div>
+        <input type="number" inputMode="numeric" value={amount||''} onChange={e=>setAmount(e.target.value)} placeholder="або введи вручну" style={inp}/>
+      </div>
+      {amount>0&&<div style={{background:`${C.red}11`,border:`1px solid ${C.red}33`,borderRadius:10,padding:'12px 16px',display:'flex',justifyContent:'space-between'}}>
+        <span style={{fontSize:12,color:C.dim}}>{sel?.name}</span>
+        <span style={{fontSize:18,fontWeight:700,color:C.red}}>-{fmt(Number(amount))} грн</span>
+      </div>}
+      <div><Lbl>ПРИЧИНА</Lbl><input type="text" value={reason} onChange={e=>setReason(e.target.value)} placeholder="Запізнення / прогул / брак" style={inp}/></div>
+      {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
+      <button type="submit" disabled={loading||success||!amount} style={{background:success?C.green:C.red,color:'#000',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',opacity:!amount?.5:1}}>
+        {loading?'Збереження...':success?'✓ Збережено!':'Оштрафувати'}
       </button>
     </form>
   </Sheet>
@@ -1929,6 +1987,16 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
         ⚠ Не вносив дані {w.daysSinceEntry} дні(в)
       </div>}
 
+      {w.fines?.length>0&&<div style={{background:`${C.red}11`,border:`2px solid ${C.red}`,borderRadius:12,padding:'12px 14px'}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.red,marginBottom:8}}>🚫 ШТРАФ</div>
+        {w.fines.map((f,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,padding:'4px 0'}}>
+          <span style={{color:C.text}}>{f.reason||'Без причини'}<span style={{color:C.muted,fontSize:10}}> · {f.date}</span></span>
+          <span style={{color:C.red,fontWeight:700,whiteSpace:'nowrap'}}>-{fmt(f.amount)} грн</span>
+        </div>)}
+        {w.fines.length>1&&<div style={{borderTop:`1px solid ${C.red}33`,marginTop:6,paddingTop:6,display:'flex',justifyContent:'space-between',fontSize:12,color:C.red,fontWeight:700}}><span>Разом</span><span>-{fmt(w.totalFines)} грн</span></div>}
+        <div style={{fontSize:10,color:C.muted,marginTop:6}}>Віднімається від виплати</div>
+      </div>}
+
       {/* Мотивація */}
       {!isOwner&&<div style={{background:`${C.accent}11`,border:`1px solid ${C.accent}33`,borderRadius:10,padding:'10px 14px',fontSize:12,color:C.accent,textAlign:'center'}}>{motiv}</div>}
 
@@ -1936,6 +2004,7 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
       <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
         {w.type==='shift'&&<button onClick={()=>setModal('shift')} style={{background:'rgba(56,189,248,0.1)',border:`1px solid ${C.accent}`,color:C.accent,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⏱ Зміна</button>}
         {isOwner&&<button onClick={()=>setModal('bonus')} style={{background:'rgba(245,158,11,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>🏆 Премія</button>}
+        {isOwner&&<button onClick={()=>setModal('fine')} style={{background:`${C.red}11`,border:`1px solid ${C.red}`,color:C.red,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>🚫 Штраф</button>}
         <button onClick={()=>setModal('advance')} style={{background:'rgba(245,158,11,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>💵 Аванс</button>
         {isOwner&&<button onClick={()=>setModal('debt')} style={{background:`${C.red}11`,border:`1px solid ${C.red}33`,color:C.red,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⚠️ Борг</button>}
         {w.debtRemaining>0&&<button onClick={()=>setModal('debtpay')} style={{background:`${C.red}11`,border:`1px solid ${C.red}`,color:C.red,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>💸 Виплата боргу</button>}
@@ -1994,6 +2063,7 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
         {w.type==='fixed'&&<Row label="Фіксована ставка" value={`${fmt(w.gross)} грн`}/>}
         <Row label="Нараховано" value={`${fmt(w.gross)} грн`} bold/>
         {w.totalAdv>0&&<Row label="Аванси" value={`-${fmt(w.totalAdv)} грн`} color={C.red}/>}
+        {w.totalFines>0&&<Row label="Штрафи" value={`-${fmt(w.totalFines)} грн`} color={C.red}/>}
         {w.debtPaid>0&&<Row label="Виплата боргу" value={`-${fmt(w.debtPaid)} грн`} color={C.red}/>}
         <div style={{display:'flex',justifyContent:'space-between',paddingTop:12}}>
           <span style={{color:C.muted,fontSize:12}}>ДО ВИПЛАТИ</span>
@@ -2014,6 +2084,11 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
         {w.advances.map((a,i)=><Row key={i} label={a.date} value={`${fmt(a.amount)} грн`} color={C.gold} last={i===w.advances.length-1}/>)}
       </Card>}
 
+      {w.fines?.length>0&&<Card>
+        <SecTitle>ШТРАФИ</SecTitle>
+        {w.fines.map((f,i)=><Row key={i} label={f.date} value={`-${fmt(f.amount)} грн`} color={C.red} sub={f.reason} last={i===w.fines.length-1}/>)}
+      </Card>}
+
       {w.bonuses?.length>0&&<Card>
         <SecTitle>ПРЕМІЇ</SecTitle>
         {w.bonuses.map((b,i)=><Row key={i} label={b.date} value={`+${fmt(b.amount)} грн`} color={C.green} sub={b.reason} last={i===w.bonuses.length-1}/>)}
@@ -2022,6 +2097,7 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
 
     {modal==='shift'  &&<ShiftForm worker={w} allWorkers={allWorkers} isOwner={isOwner} onClose={()=>setModal(null)} onSaved={()=>{onRefresh();setModal(null)}} tgId={tgId} tgName={tgName} cfg={cfg}/>}
     {modal==='bonus'  &&<BonusForm worker={w} allWorkers={allWorkers} onClose={()=>setModal(null)} onSaved={()=>{onRefresh();setModal(null)}} tgId={tgId} tgName={tgName}/>}
+    {modal==='fine'   &&<FineForm worker={w} allWorkers={allWorkers} onClose={()=>setModal(null)} onSaved={()=>{onRefresh();setModal(null)}} tgId={tgId} tgName={tgName}/>}
     {modal==='advance'&&<AdvanceForm worker={w} allWorkers={allWorkers} isOwner={isOwner} onClose={()=>setModal(null)} onSaved={()=>{onRefresh();setModal(null)}} tgId={tgId} tgName={tgName}/>}
     {modal==='debt'   &&<AddDebtForm worker={w} allWorkers={allWorkers} onClose={()=>setModal(null)} onSaved={()=>{onRefresh();setModal(null)}} tgId={tgId} tgName={tgName}/>}
     {modal==='debtpay'&&<DebtPaymentForm worker={w} onClose={()=>setModal(null)} onSaved={()=>{onRefresh();setModal(null)}} tgId={tgId} tgName={tgName}/>}
@@ -2075,9 +2151,10 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
         <Card top={C.green}><Lbl>Нараховано</Lbl><div style={{fontSize:18,fontWeight:700,color:C.green}}>{fmt(totalGross)} ₴</div></Card>
       </div>
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr',gap:8}}>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:6}}>
         <button onClick={()=>setModal('shift')} style={{background:'rgba(56,189,248,0.1)',border:`1px solid ${C.accent}`,color:C.accent,borderRadius:10,padding:'10px 4px',fontSize:11,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⏱ Зміна</button>
         <button onClick={()=>setModal('bonus')} style={{background:'rgba(245,158,11,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'10px 4px',fontSize:11,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>🏆 Премія</button>
+        <button onClick={()=>setModal('fine')} style={{background:`${C.red}11`,border:`1px solid ${C.red}`,color:C.red,borderRadius:10,padding:'10px 2px',fontSize:10,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>🚫 Штраф</button>
         <button onClick={()=>setView('debts')} style={{background:`${C.red}11`,border:`1px solid ${C.red}33`,color:C.red,borderRadius:10,padding:'10px 4px',fontSize:11,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>💸 Борги</button>
         <button onClick={()=>setModal('addworker')} style={{background:'rgba(34,197,94,0.1)',border:`1px solid ${C.green}`,color:C.green,borderRadius:10,padding:'10px 4px',fontSize:11,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>➕ Додати</button>
       </div>
@@ -2129,6 +2206,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
 
     {modal==='shift'    &&<ShiftForm worker={workers[0]||{}} allWorkers={workers} isOwner onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName} cfg={cfg}/>}
     {modal==='bonus'    &&<BonusForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
+    {modal==='fine'     &&<FineForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
     {modal==='addworker'&&<AddWorkerForm onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
     {modal==='settings' &&<SettingsForm cfg={cfg} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
   </div>
@@ -2170,6 +2248,16 @@ function WorkerView({tgId,data,onRefresh}) {
         <Card top={C.accent}><Lbl>До виплати</Lbl><div style={{fontSize:22,fontWeight:700,color:C.accent}}>{fmt(w.final)} ₴</div></Card>
         <Card top={C.green}><Lbl>Нараховано</Lbl><div style={{fontSize:18,fontWeight:700,color:C.green}}>{fmt(w.gross)} ₴</div></Card>
       </div>
+
+      {w.fines?.length>0&&<div style={{background:`${C.red}11`,border:`2px solid ${C.red}`,borderRadius:12,padding:'12px 14px'}}>
+        <div style={{fontSize:12,fontWeight:700,color:C.red,marginBottom:8}}>🚫 ШТРАФ</div>
+        {w.fines.map((f,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,padding:'4px 0'}}>
+          <span style={{color:C.text}}>{f.reason||'Без причини'}<span style={{color:C.muted,fontSize:10}}> · {f.date}</span></span>
+          <span style={{color:C.red,fontWeight:700,whiteSpace:'nowrap'}}>-{fmt(f.amount)} грн</span>
+        </div>)}
+        {w.fines.length>1&&<div style={{borderTop:`1px solid ${C.red}33`,marginTop:6,paddingTop:6,display:'flex',justifyContent:'space-between',fontSize:12,color:C.red,fontWeight:700}}><span>Разом</span><span>-{fmt(w.totalFines)} грн</span></div>}
+        <div style={{fontSize:10,color:C.muted,marginTop:6}}>Віднімається від виплати</div>
+      </div>}
 
       {/* Мотивація */}
       <div style={{background:`${C.accent}11`,border:`1px solid ${C.accent}33`,borderRadius:10,padding:'10px 14px',fontSize:12,color:C.accent,textAlign:'center'}}>{motiv}</div>
@@ -2246,6 +2334,7 @@ function WorkerView({tgId,data,onRefresh}) {
         {w.manualBonus>0&&<Row label="Ручні премії" value={`+${fmt(w.manualBonus)} грн`} color={C.green}/>}
         <Row label="Нараховано" value={`${fmt(w.gross)} грн`} bold/>
         {w.totalAdv>0&&<Row label="Аванси" value={`-${fmt(w.totalAdv)} грн`} color={C.red}/>}
+        {w.totalFines>0&&<Row label="Штрафи" value={`-${fmt(w.totalFines)} грн`} color={C.red}/>}
         {w.debtPaid>0&&<Row label="Виплата боргу" value={`-${fmt(w.debtPaid)} грн`} color={C.red}/>}
         <div style={{display:'flex',justifyContent:'space-between',paddingTop:12}}>
           <span style={{color:C.muted,fontSize:12}}>ДО ВИПЛАТИ</span>
