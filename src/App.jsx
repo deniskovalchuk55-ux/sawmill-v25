@@ -44,6 +44,12 @@ const C = {
   red:'#e5392f',muted:'#8a8a84',text:'#171717',dim:'#5b5b57',purple:'#6d4fd1',
   w:['#171717','#15803d','#b7791f','#6d4fd1','#e5392f','#0f766e','#2563eb','#be185d'],
 }
+const IC={clock:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/>',star:'<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',ban:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',card:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M15 15h2"/>',box:'<path d="M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10"/>',tree:'<path d="M12 3l6 8h-3l5 7H4l5-7H6z"/><path d="M12 18v3"/>',fuel:'<path d="M5 21V5a2 2 0 012-2h6a2 2 0 012 2v16M5 21h10M15 9h2a2 2 0 012 2v6a1.5 1.5 0 003 0V9l-3-3M8 8h4"/>',bulb:'<path d="M9 18h6M10 21h4M12 3a6 6 0 00-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0012 3z"/>',chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',doc:'<path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7"/>',home:'<path d="M3 11l9-8 9 8v9H3z"/>',user:'<circle cx="10" cy="8" r="4"/><path d="M3 20c0-4 3-6 7-6M18 14v6M15 17h6"/>',wallet:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M15 15h2"/>'}
+const Ico = ({n,s=22}) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{__html:IC[n]}}/>
+const Tile = ({n,label,onClick,primary,danger,wide}) =>
+  <button onClick={onClick} style={{gridColumn:wide?'1 / -1':undefined,background:primary?C.yellow:C.surface,color:danger?C.red:C.ink,border:danger?`2px solid ${C.red}`:'none',borderRadius:20,padding:wide?'14px 16px':'12px 8px 10px',fontSize:wide?14:11.5,fontWeight:800,cursor:'pointer',fontFamily:'inherit',textAlign:wide?'center':'left',display:'flex',flexDirection:wide?'row':'column',justifyContent:wide?'center':'flex-start',alignItems:wide?'center':'flex-start',gap:wide?10:14,minHeight:wide?0:84}}>
+    <Ico n={n}/><span>{label}</span>
+  </button>
 const fmt  = n => Math.round(n||0).toLocaleString('uk-UA')
 const fmtH = n => Number(n||0).toFixed(1)
 const todayStr = () => {
@@ -1000,7 +1006,7 @@ function FinesView({workers,onBack,onRefresh,tgId,tgName,month,year}) {
   const fined = workers.filter(w=>(w.totalFines||0)>0)
   const total = fined.reduce((s,w)=>s+w.totalFines,0)
   return <div style={{minHeight:'100vh',background:C.bg,paddingBottom:40}}>
-    <Header title="🚫 Штрафи" sub={`${MONTHS_UA[month]} ${year}`} onBack={onBack}/>
+    <Header title="Штрафи" sub={`${MONTHS_UA[month]} ${year}`} onBack={onBack}/>
     <div style={{padding:'8px 16px 0',display:'flex',flexDirection:'column',gap:14}}>
       <div style={{background:C.ink,borderRadius:26,padding:'20px 22px',color:'#fff'}}>
         <div style={{fontSize:11,letterSpacing:2,opacity:.6,textTransform:'uppercase'}}>Штрафів за місяць</div>
@@ -1016,7 +1022,7 @@ function FinesView({workers,onBack,onRefresh,tgId,tgName,month,year}) {
           <span>{f.date?.slice(5).split('-').reverse().join('.')} · {f.reason||'без причини'}</span><span>{fmt(f.amount)} ₴</span>
         </div>)}
       </div>)}
-      <button onClick={()=>setModal(true)} style={{background:C.red,color:'#fff',border:'none',borderRadius:16,padding:14,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>🚫 Оштрафувати</button>
+      <button onClick={()=>setModal(true)} style={{background:C.red,color:'#fff',border:'none',borderRadius:16,padding:14,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Оштрафувати</button>
     </div>
     {modal&&<FineForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(false)} onSaved={()=>{onRefresh()}} tgId={tgId} tgName={tgName}/>}
   </div>
@@ -1029,7 +1035,7 @@ function DebtsView({workers,onBack,onRefresh,tgId,tgName}) {
   const totalDebt = debtors.reduce((s,w)=>s+w.debtRemaining,0)
 
   return <div style={{minHeight:'100vh',background:C.bg,paddingBottom:40}}>
-    <Header title="💸 Борги" onBack={onBack}/>
+    <Header title="Борги" onBack={onBack}/>
     <div style={{padding:'16px 16px 0',display:'flex',flexDirection:'column',gap:14}}>
       <Card top={C.red}>
         <Lbl>Загальний борг</Lbl>
@@ -2015,7 +2021,7 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
       </div>}
 
       {w.fines?.length>0&&<div style={{background:`${C.red}11`,border:`2px solid ${C.red}`,borderRadius:12,padding:'12px 14px'}}>
-        <div style={{fontSize:12,fontWeight:700,color:C.red,marginBottom:8}}>🚫 ШТРАФ</div>
+        <div style={{fontSize:12,fontWeight:700,color:C.red,marginBottom:8}}>ШТРАФ</div>
         {w.fines.map((f,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,padding:'4px 0'}}>
           <span style={{color:C.text}}>{f.reason||'Без причини'}<span style={{color:C.muted,fontSize:10}}> · {f.date}</span></span>
           <span style={{color:C.red,fontWeight:700,whiteSpace:'nowrap'}}>-{fmt(f.amount)} грн</span>
@@ -2165,7 +2171,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
   if (detail) return <WorkerDetail w={detail} allWorkers={workers} isOwner onBack={()=>setDetail(null)} onRefresh={()=>{setDetail(null);onRefresh(year,month)}} tgId={tgId} tgName={tgName} cfg={cfg} month={month} year={year}/>
 
   return <div style={{minHeight:'100vh',background:C.bg,paddingBottom:90}}>
-    <Header title="🪵 ПИЛОРАМА" sub={`${MONTHS_UA[month]} ${year}`} onRefresh={()=>onRefresh(year,month)}
+    <Header title="ПилоРама" sub={`${MONTHS_UA[month]} ${year}`} onRefresh={()=>onRefresh(year,month)}
       right={<button onClick={()=>setModal('settings')} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.purple,borderRadius:8,padding:'6px 10px',fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>⚙️</button>}/>
 
     <div style={{padding:'16px 16px 0',display:'flex',flexDirection:'column',gap:14}}>
@@ -2182,20 +2188,15 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
         <div style={{position:'relative',fontSize:12,opacity:.65,marginTop:4}}>Нараховано {fmt(totalGross)} ₴{totalFinesAll>0?` · штрафи −${fmt(totalFinesAll)} ₴`:''}</div>
       </div>
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-        {[
-          ['shift','⏱','Зміна',true],['bonus','🏆','Премія',false],
-          ['fine','🚫','Штраф',false],['addworker','➕','Додати',false],
-        ].map(([k,ic,lb,y])=><button key={k} onClick={()=>setModal(k)} style={{background:y?C.yellow:C.surface,color:k==='fine'?C.red:C.ink,border:k==='fine'?`2px solid ${C.red}`:'none',borderRadius:20,padding:'16px 14px',fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',textAlign:'left',display:'flex',alignItems:'center',gap:10}}>
-          <span style={{fontSize:20}}>{ic}</span>{lb}
-        </button>)}
-      </div>
-
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-        {[['shipments','📦','Відправки'],['intake','🌲','Сировина'],['fuel','⛽','Паливо'],['electricity','💡','Світло']].map(([k,ic,lb])=>
-          <button key={k} onClick={()=>setView(k)} style={{background:C.surface,color:C.ink,border:`1px solid ${C.border}`,borderRadius:20,padding:'14px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit',textAlign:'left',display:'flex',alignItems:'center',gap:10}}>
-            <span style={{fontSize:18}}>{ic}</span>{lb}
-          </button>)}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
+        <Tile n="clock" label="Зміна" primary onClick={()=>setModal('shift')}/>
+        <Tile n="star" label="Премія" onClick={()=>setModal('bonus')}/>
+        <Tile n="ban" label="Штраф" danger onClick={()=>setModal('fine')}/>
+        <Tile n="user" label="Додати" onClick={()=>setModal('addworker')}/>
+        <Tile n="box" label="Відправки" onClick={()=>setView('shipments')}/>
+        <Tile n="tree" label="Сировина" onClick={()=>setView('intake')}/>
+        <Tile n="fuel" label="Паливо" onClick={()=>setView('fuel')}/>
+        <Tile n="bulb" label="Світло" onClick={()=>setView('electricity')}/>
       </div>
 
       <Card>
@@ -2239,8 +2240,8 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
     </div>
 
     <div style={{position:'fixed',left:'50%',transform:'translateX(-50%)',bottom:14,background:C.ink,borderRadius:30,padding:6,display:'flex',gap:4,zIndex:50,boxShadow:'0 8px 24px rgba(0,0,0,.25)'}}>
-      {[['main','Головна'],['fines','Штрафи'],['debts','Борги']].map(([k,l])=>
-        <button key={k} onClick={()=>setView(k)} style={{background:view===k?C.yellow:'transparent',color:view===k?C.ink:'#fff',border:'none',borderRadius:24,padding:'10px 18px',fontSize:13,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>{l}</button>)}
+      {[['main','Головна','home'],['fines','Штрафи','ban'],['debts','Борги','wallet']].map(([k,l,ic])=>
+        <button key={k} onClick={()=>setView(k)} style={{background:view===k?C.yellow:'transparent',color:view===k?C.ink:'#fff',border:'none',borderRadius:24,padding:'8px 18px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}><Ico n={ic} s={20}/>{l}</button>)}
     </div>
     {modal==='shift'    &&<ShiftForm worker={workers[0]||{}} allWorkers={workers} isOwner onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName} cfg={cfg}/>}
     {modal==='bonus'    &&<BonusForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
@@ -2278,7 +2279,7 @@ function WorkerView({tgId,data,onRefresh}) {
   }))
 
   return <div style={{minHeight:'100vh',background:C.bg,paddingBottom:40}}>
-    <Header title={`🪵 ${w.name||'Мій кабінет'}`} onRefresh={()=>onRefresh(year,month)}/>
+    <Header title={w.name||'Мій кабінет'} onRefresh={()=>onRefresh(year,month)}/>
     <div style={{padding:'16px 16px 0',display:'flex',flexDirection:'column',gap:14}}>
       <MonthPicker year={year} month={month} onChange={(y,m)=>{setYear(y);setMonth(m);onRefresh(y,m)}}/>
 
@@ -2288,7 +2289,7 @@ function WorkerView({tgId,data,onRefresh}) {
       </div>
 
       {w.fines?.length>0&&<div style={{background:`${C.red}11`,border:`2px solid ${C.red}`,borderRadius:12,padding:'12px 14px'}}>
-        <div style={{fontSize:12,fontWeight:700,color:C.red,marginBottom:8}}>🚫 ШТРАФ</div>
+        <div style={{fontSize:12,fontWeight:700,color:C.red,marginBottom:8}}>ШТРАФ</div>
         {w.fines.map((f,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,padding:'4px 0'}}>
           <span style={{color:C.text}}>{f.reason||'Без причини'}<span style={{color:C.muted,fontSize:10}}> · {f.date}</span></span>
           <span style={{color:C.red,fontWeight:700,whiteSpace:'nowrap'}}>-{fmt(f.amount)} грн</span>
@@ -2316,14 +2317,13 @@ function WorkerView({tgId,data,onRefresh}) {
         </div>
       </Card>
 
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
-        <button onClick={()=>setModal('shift')} style={{background:'rgba(255,214,10,0.28)',border:`1px solid ${C.accent}`,color:C.accent,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⏱ Внести зміну</button>
-        <button onClick={()=>setModal('advance')} style={{background:'rgba(183,121,31,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>💵 Аванс</button>
-        <button onClick={()=>setShowStats(true)} style={{background:'rgba(167,139,250,0.1)',border:`1px solid ${C.purple}`,color:C.purple,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>📊 Статистика</button>
-        <button onClick={()=>setShowPayslip(true)} style={{background:'rgba(21,128,61,0.1)',border:`1px solid ${C.green}`,color:C.green,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>📄 Листок</button>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
+        <Tile n="clock" label="Зміна" primary onClick={()=>setModal('shift')}/>
+        <Tile n="card" label="Аванс" onClick={()=>setModal('advance')}/>
+        <Tile n="chart" label="Звіт" onClick={()=>setShowStats(true)}/>
+        <Tile n="doc" label="Листок" onClick={()=>setShowPayslip(true)}/>
+        {w.fuelAccess&&<Tile n="fuel" label="Внести паливо" wide onClick={()=>setView('fuel')}/>}
       </div>
-
-      {w.fuelAccess&&<button onClick={()=>setView('fuel')} style={{width:'100%',background:'rgba(183,121,31,0.1)',border:`1px solid ${C.gold}`,color:C.gold,borderRadius:10,padding:'12px',fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700}}>⛽ Внести паливо</button>}
 
       {hoursChart.length>0&&<Card>
         <SecTitle>ГОДИНИ ПО ДНЯХ ⭐=10+</SecTitle>
