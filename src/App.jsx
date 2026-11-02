@@ -2235,7 +2235,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
       </Card>
       </>}
 
-      {(tab==='people'||tab==='home')&&<>
+      {tab==='people'&&<>
       <div style={{fontSize:16,fontWeight:800,marginTop:4}}>Персонал</div>
       <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Пошук працівника..." style={{...inp,background:C.surface,border:'none',borderRadius:16,fontSize:14,padding:'13px 16px'}}/>
       {filtered.map((w,i)=>{
@@ -2258,7 +2258,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
     </div>
 
     <div style={{position:'fixed',left:'50%',transform:'translateX(-50%)',bottom:14,background:C.ink,borderRadius:30,padding:6,display:'flex',gap:4,zIndex:50,boxShadow:'0 8px 24px rgba(0,0,0,.25)'}}>
-      {[['home','Головна','home'],['people','Люди','user'],['reports','Звіти','chart']].map(([k,l,ic])=>
+      {[['home','Головна','home'],['people','Персонал','user'],['reports','Звіти','chart']].map(([k,l,ic])=>
         <button key={k} onClick={()=>setTab(k)} style={{background:tab===k?C.yellow:'transparent',color:tab===k?C.ink:'#fff',border:'none',borderRadius:24,padding:'8px 18px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}><Ico n={ic} s={20}/>{l}</button>)}
     </div>
     {modal==='advance'  &&<AdvanceForm worker={workers[0]||{}} allWorkers={workers} isOwner onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
