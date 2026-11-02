@@ -2179,8 +2179,8 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
       <MonthPicker year={year} month={month} onChange={onMonthChange}/>
 
       {tab==='home'&&<>
-      {alertWorkers.length>0&&<div style={{background:`${C.red}11`,border:`1px solid ${C.red}33`,borderRadius:10,padding:'10px 14px',fontSize:12,color:C.red}}>
-        ⚠ Не вносили 2+ дні: {alertWorkers.map(w=>w.name.split(' ')[0]).join(', ')}
+      {alertWorkers.length>0&&<div style={{background:C.yellow,borderRadius:20,padding:'14px 16px',fontSize:14,fontWeight:800,color:C.ink}}>
+        Не вносили 2+ дні: {alertWorkers.map(w=>w.name.split(' ').slice(0,2).join(' ')).join(', ')}
       </div>}
 
       <div style={{position:'relative',overflow:'hidden',background:C.ink,borderRadius:28,padding:'22px 22px 20px',color:'#fff'}}>
@@ -2194,13 +2194,14 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
         <Tile n="clock" label="Зміна" primary onClick={()=>setModal('shift')}/>
         <Tile n="star" label="Премія" onClick={()=>setModal('bonus')}/>
         <Tile n="ban" label="Штраф" danger onClick={()=>setModal('fine')}/>
-        <Tile n="user" label="Додати" onClick={()=>setModal('addworker')}/>
+        <Tile n="card" label="Аванс" onClick={()=>setModal('advance')}/>
         <Tile n="box" label="Відправки" onClick={()=>setView('shipments')}/>
         <Tile n="tree" label="Сировина" onClick={()=>setView('intake')}/>
         <Tile n="fuel" label="Паливо" onClick={()=>setView('fuel')}/>
         <Tile n="bulb" label="Світло" onClick={()=>setView('electricity')}/>
-        <Tile n="ban" label="Штрафи" onClick={()=>setView('fines')}/>
         <Tile n="wallet" label="Борги" onClick={()=>setView('debts')}/>
+        <Tile n="ban" label="Штрафи" onClick={()=>setView('fines')}/>
+        <Tile n="user" label="Працівник" onClick={()=>setModal('addworker')}/>
       </div>
       </>}
 
@@ -2234,31 +2235,25 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
       </Card>
       </>}
 
-      {tab==='people'&&<>
-      <Card>
-        <SecTitle>ПЕРСОНАЛ</SecTitle>
-        {/* Пошук */}
-        <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍 Пошук працівника..." style={{...inp,marginBottom:12,fontSize:13}}/>
-        {filtered.map((w,i)=><button key={w.tgId||i} onClick={()=>setDetail(w)} style={{width:'100%',background:'#fff',border:`1px solid ${w.daysSinceEntry>=2&&w.type==='shift'?C.red:C.border}`,borderRadius:10,padding:'12px 14px',marginBottom:8,cursor:'pointer',textAlign:'left',fontFamily:'inherit'}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:w.type==='shift'?6:0}}>
-            <div>
-              <span style={{color:C.w[i%C.w.length],fontWeight:600,fontSize:13}}>{w.name}</span>
-              {w.type==='fixed'&&<span style={{marginLeft:8,fontSize:10,color:C.purple,background:`${C.purple}22`,padding:'1px 6px',borderRadius:4}}>{w.role||'фікс.'}</span>}
-              {w.daysSinceEntry>=2&&w.type==='shift'&&<span style={{marginLeft:6,fontSize:10,color:C.red}}>⚠</span>}
+      {(tab==='people'||tab==='home')&&<>
+      <div style={{fontSize:16,fontWeight:800,marginTop:4}}>Персонал</div>
+      <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Пошук працівника..." style={{...inp,background:C.surface,border:'none',borderRadius:16,fontSize:14,padding:'13px 16px'}}/>
+      {filtered.map((w,i)=>{
+        const ini=w.name.split(' ').slice(0,2).map(x=>x[0]||'').join('').toUpperCase()
+        const late=w.daysSinceEntry>=2&&w.type==='shift'
+        return <button key={w.tgId||i} onClick={()=>setDetail(w)} style={{width:'100%',background:C.surface,border:late?`2px solid ${C.red}`:'none',borderRadius:22,padding:'12px 14px',cursor:'pointer',textAlign:'left',fontFamily:'inherit',display:'flex',alignItems:'center',gap:12,color:C.ink}}>
+          <div style={{width:44,height:44,borderRadius:'50%',background:C.ink,color:C.yellow,display:'flex',alignItems:'center',justifyContent:'center',fontWeight:800,fontSize:14,flexShrink:0}}>{ini}</div>
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontWeight:800,fontSize:15,whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>{w.name}</div>
+            <div style={{fontSize:12,color:C.dim,marginTop:2}}>
+              {w.type==='fixed'?(w.role||'Фіксована'):`${w.workDays} днів · ${fmtH(w.totalHours)} год`}
+              {w.totalFines>0&&<b style={{color:C.red}}> · штраф −{fmt(w.totalFines)}</b>}
+              {w.debtRemaining>0&&<b style={{color:C.red}}> · борг {fmt(w.debtRemaining)}</b>}
             </div>
-            <span style={{color:C.accent,fontWeight:700,fontSize:13}}>{fmt(w.final)} ₴</span>
           </div>
-          {w.type==='shift'&&<>
-            <Prog val={w.workDays} max={cfg?.premiumDays||21} color={C.w[i%C.w.length]}/>
-            <div style={{display:'flex',justifyContent:'space-between',marginTop:4,fontSize:10,color:C.muted}}>
-              <span>{w.workDays} днів · {fmtH(w.totalHours)} год</span>
-              <span>{w.longDays} довгих · {w.totalPacks} пачок</span>
-            </div>
-          </>}
-          {w.debtRemaining>0&&<div style={{marginTop:5,fontSize:10,color:C.red}}>⚠ Борг: {fmt(w.debtRemaining)} грн</div>}
-        </button>)}
-        {filtered.length===0&&<div style={{textAlign:'center',color:C.muted,fontSize:13,padding:16}}>Нікого не знайдено</div>}
-      </Card>
+          <div style={{fontWeight:800,fontSize:16}}>{fmt(w.final)}</div>
+        </button>})}
+      {filtered.length===0&&<div style={{textAlign:'center',color:C.muted,fontSize:13,padding:16}}>Нікого не знайдено</div>}
       </>}
     </div>
 
@@ -2266,6 +2261,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
       {[['home','Головна','home'],['people','Люди','user'],['reports','Звіти','chart']].map(([k,l,ic])=>
         <button key={k} onClick={()=>setTab(k)} style={{background:tab===k?C.yellow:'transparent',color:tab===k?C.ink:'#fff',border:'none',borderRadius:24,padding:'8px 18px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}><Ico n={ic} s={20}/>{l}</button>)}
     </div>
+    {modal==='advance'  &&<AdvanceForm worker={workers[0]||{}} allWorkers={workers} isOwner onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
     {modal==='shift'    &&<ShiftForm worker={workers[0]||{}} allWorkers={workers} isOwner onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName} cfg={cfg}/>}
     {modal==='bonus'    &&<BonusForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
     {modal==='fine'     &&<FineForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
