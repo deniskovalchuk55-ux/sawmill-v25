@@ -2149,6 +2149,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
   const [detail, setDetail] = useState(null)
   const [modal,  setModal]  = useState(null)
   const [search, setSearch] = useState('')
+  const [tab,    setTab]    = useState('home')
 
   const totalFOP   = workers.reduce((s,w)=>s+(w.final||0),0)
   const totalGross = workers.reduce((s,w)=>s+(w.gross||0),0)
@@ -2177,6 +2178,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
     <div style={{padding:'16px 16px 0',display:'flex',flexDirection:'column',gap:14}}>
       <MonthPicker year={year} month={month} onChange={onMonthChange}/>
 
+      {tab==='home'&&<>
       {alertWorkers.length>0&&<div style={{background:`${C.red}11`,border:`1px solid ${C.red}33`,borderRadius:10,padding:'10px 14px',fontSize:12,color:C.red}}>
         ⚠ Не вносили 2+ дні: {alertWorkers.map(w=>w.name.split(' ')[0]).join(', ')}
       </div>}
@@ -2197,8 +2199,18 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
         <Tile n="tree" label="Сировина" onClick={()=>setView('intake')}/>
         <Tile n="fuel" label="Паливо" onClick={()=>setView('fuel')}/>
         <Tile n="bulb" label="Світло" onClick={()=>setView('electricity')}/>
+        <Tile n="ban" label="Штрафи" onClick={()=>setView('fines')}/>
+        <Tile n="wallet" label="Борги" onClick={()=>setView('debts')}/>
       </div>
+      </>}
 
+      {tab==='reports'&&<>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+        <Card><Lbl>Нараховано</Lbl><div style={{fontSize:20,fontWeight:800}}>{fmt(totalGross)} ₴</div></Card>
+        <Card><Lbl>До виплати</Lbl><div style={{fontSize:20,fontWeight:800}}>{fmt(totalFOP)} ₴</div></Card>
+        <Card><Lbl>Штрафи</Lbl><div style={{fontSize:20,fontWeight:800,color:C.red}}>{fmt(totalFinesAll)} ₴</div></Card>
+        <Card><Lbl>Борги</Lbl><div style={{fontSize:20,fontWeight:800,color:C.red}}>{fmt(workers.reduce((s,w)=>s+(w.debtRemaining||0),0))} ₴</div></Card>
+      </div>
       <Card>
         <SecTitle>НАРАХУВАННЯ</SecTitle>
         <ResponsiveContainer width="100%" height={160}>
@@ -2213,6 +2225,16 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
         </ResponsiveContainer>
       </Card>
 
+      <Card>
+        <SecTitle>ГОДИНИ І ВИПЛАТИ · {MONTHS_UA[month].toUpperCase()}</SecTitle>
+        {workers.map(w=><div key={w.tgId||w.name} style={{display:'flex',justifyContent:'space-between',gap:8,fontSize:12,padding:'8px 0',borderBottom:`1px solid ${C.border}`}}>
+          <span style={{fontWeight:700}}>{w.name}</span>
+          <span style={{color:C.dim,textAlign:'right'}}>{w.type==='shift'?`${fmtH(w.totalHours)} год · ${w.totalPacks||0} пач · `:''}<b style={{color:C.ink}}>{fmt(w.final)} ₴</b></span>
+        </div>)}
+      </Card>
+      </>}
+
+      {tab==='people'&&<>
       <Card>
         <SecTitle>ПЕРСОНАЛ</SecTitle>
         {/* Пошук */}
@@ -2237,11 +2259,12 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
         </button>)}
         {filtered.length===0&&<div style={{textAlign:'center',color:C.muted,fontSize:13,padding:16}}>Нікого не знайдено</div>}
       </Card>
+      </>}
     </div>
 
     <div style={{position:'fixed',left:'50%',transform:'translateX(-50%)',bottom:14,background:C.ink,borderRadius:30,padding:6,display:'flex',gap:4,zIndex:50,boxShadow:'0 8px 24px rgba(0,0,0,.25)'}}>
-      {[['main','Головна','home'],['fines','Штрафи','ban'],['debts','Борги','wallet']].map(([k,l,ic])=>
-        <button key={k} onClick={()=>setView(k)} style={{background:view===k?C.yellow:'transparent',color:view===k?C.ink:'#fff',border:'none',borderRadius:24,padding:'8px 18px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}><Ico n={ic} s={20}/>{l}</button>)}
+      {[['home','Головна','home'],['people','Люди','user'],['reports','Звіти','chart']].map(([k,l,ic])=>
+        <button key={k} onClick={()=>setTab(k)} style={{background:tab===k?C.yellow:'transparent',color:tab===k?C.ink:'#fff',border:'none',borderRadius:24,padding:'8px 18px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}><Ico n={ic} s={20}/>{l}</button>)}
     </div>
     {modal==='shift'    &&<ShiftForm worker={workers[0]||{}} allWorkers={workers} isOwner onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName} cfg={cfg}/>}
     {modal==='bonus'    &&<BonusForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
@@ -2278,7 +2301,7 @@ function WorkerView({tgId,data,onRefresh}) {
     long:d.hours>=(cfg?.longDayHours||10)?d.hours:0,
   }))
 
-  return <div style={{minHeight:'100vh',background:C.bg,paddingBottom:40}}>
+  return <div style={{minHeight:'100vh',background:C.bg,paddingBottom:90}}>
     <Header title={w.name||'Мій кабінет'} onRefresh={()=>onRefresh(year,month)}/>
     <div style={{padding:'16px 16px 0',display:'flex',flexDirection:'column',gap:14}}>
       <MonthPicker year={year} month={month} onChange={(y,m)=>{setYear(y);setMonth(m);onRefresh(y,m)}}/>
@@ -2391,6 +2414,10 @@ function WorkerView({tgId,data,onRefresh}) {
       </Card>}
     </div>
 
+    <div style={{position:'fixed',left:'50%',transform:'translateX(-50%)',bottom:14,background:C.ink,borderRadius:30,padding:6,display:'flex',gap:4,zIndex:50,boxShadow:'0 8px 24px rgba(0,0,0,.25)'}}>
+      {[['home','Головна','home',()=>window.scrollTo({top:0,behavior:'smooth'})],['stats','Звіт','chart',()=>setShowStats(true)],['slip','Листок','doc',()=>setShowPayslip(true)]].map(([k,l,ic,fn])=>
+        <button key={k} onClick={fn} style={{background:k==='home'?C.yellow:'transparent',color:k==='home'?C.ink:'#fff',border:'none',borderRadius:24,padding:'8px 18px',fontSize:11,fontWeight:700,cursor:'pointer',fontFamily:'inherit',display:'flex',flexDirection:'column',alignItems:'center',gap:3}}><Ico n={ic} s={20}/>{l}</button>)}
+    </div>
     {modal==='shift'  &&<ShiftForm worker={w} allWorkers={[w]} isOwner={false} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={w.name} cfg={cfg}/>}
     {modal==='advance'&&<AdvanceForm worker={w} allWorkers={[w]} isOwner={false} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={w.name}/>}
     {workerEditDay&&<EditDayForm day={workerEditDay} worker={w} onClose={()=>setWorkerEditDay(null)} onSaved={()=>{onRefresh(year,month);setWorkerEditDay(null)}} tgId={tgId} tgName={w.name} cfg={cfg}/>}
