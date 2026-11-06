@@ -212,33 +212,60 @@ async function writeSettingEntries(key, tgId, changes) {
   }
 }
 
-export async function fetchAllData(year, month) {
+export const EMPTY_MONTH = { shifts:[], advances:[], bonuses:[], debtPayments:[], fines:[] }
+
+// Дані, що не залежать від місяця (завантажуємо один раз)
+export async function fetchShared() {
+  const [staff, fixedStaff, debts, settings, settingsLog] = await Promise.all([
+    queryDB(DB.staff),
+    queryDB(DB.fixedStaff),
+    queryDB(DB.debts),
+    fetchSettings(),
+    fetchSettingsLog(),
+  ])
+  return {
+    staff:       staff.results.map(parseStaff),
+    fixedStaff:  fixedStaff.results.map(parseFixed),
+    debts:       debts.results.map(parseDebt),
+    cfg:         settings,
+    settingsLog,
+  }
+}
+
+// Дані конкретного місяця (кешуються окремо)
+export async function fetchMonthData(year, month) {
   const df = f => dateFilter(f, year, month)
-  const [shifts, staff, advances, bonuses, fixedStaff, debts, debtPayments, settings, fines, settingsLog] =
-    await Promise.all([
-      queryDB(DB.shifts,       df('Дата')),
-      queryDB(DB.staff),
-      queryDB(DB.advances,     df('Дата')),
-      queryDB(DB.bonuses,      df('Дата')),
-      queryDB(DB.fixedStaff),
-      queryDB(DB.debts),
-      queryDB(DB.debtPayments, df('Дата')),
-      fetchSettings(),
-      DB.fines ? queryDB(DB.fines, df('Дата')) : Promise.resolve({results:[]}),
-      fetchSettingsLog(),
-    ])
-  const base = {
+  const [shifts, advances, bonuses, debtPayments, fines] = await Promise.all([
+    queryDB(DB.shifts,       df('Дата')),
+    queryDB(DB.advances,     df('Дата')),
+    queryDB(DB.bonuses,      df('Дата')),
+    queryDB(DB.debtPayments, df('Дата')),
+    DB.fines ? queryDB(DB.fines, df('Дата')) : Promise.resolve({results:[]}),
+  ])
+  return {
     shifts:       shifts.results.map(parseShift),
-    staff:        staff.results.map(parseStaff),
     advances:     advances.results.map(parseAdvance),
     bonuses:      bonuses.results.map(parseBonus),
-    fines:        fines.results.map(parseFine),
-    fixedStaff:   fixedStaff.results.map(parseFixed),
-    debts:        debts.results.map(parseDebt),
     debtPayments: debtPayments.results.map(parseDP),
-    cfg:          settings,
+    fines:        fines.results.map(parseFine),
   }
-  return applyHistory(base, monthKey(year, month), settingsLog)
+}
+
+// Склеює спільні дані й місяць, застосовуючи історію налаштувань для цього місяця
+export function assembleData(shared, md, year, month) {
+  const base = {
+    ...md,
+    staff:      shared.staff,
+    fixedStaff: shared.fixedStaff,
+    debts:      shared.debts,
+    cfg:        shared.cfg,
+  }
+  return applyHistory(base, monthKey(year, month), shared.settingsLog || [])
+}
+
+export async function fetchAllData(year, month) {
+  const [shared, md] = await Promise.all([fetchShared(), fetchMonthData(year, month)])
+  return assembleData(shared, md, year, month)
 }
 
 export async function fetchMonthlyStats(tgId, monthsCount = 6) {
