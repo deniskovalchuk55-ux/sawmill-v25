@@ -910,6 +910,7 @@ export function calcSalary(tgId, data) {
     lowRateOn:si.lowRateOn||false, lowRateDays:si.lowRateDays??19,
     rateHourLow:si.rateHourLow??null, ratePackLow:si.ratePackLow??null,
     lowRateApplied:useLowRate,
+    eMinDays, eLongNeed, ePremDays, ePremAmt, eLongBonus, eSatBonus, eLongHours,
     bonusOff, premiumOff, ind, fuelAccess:si.fuelAccess||false,
     totalHours, totalPacks, workDays, longDays:longDaysCalc, saturdays, days,
     earnHours, earnPacks, base, bonusActive,

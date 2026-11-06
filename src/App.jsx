@@ -13,7 +13,6 @@ import { fetchShared, fetchMonthData, assembleData, EMPTY_MONTH, fetchMonthlySta
          intakeStatsByWood, intakeStatsBySupplier, buildIntakeReport,
          FUEL_TYPES, FUEL_GRADES, fetchFuel, saveFuel, updateFuel, deleteFuel, fuelStats,
          fetchElectricity, fetchElectricityAll, saveElectricity, updateElectricity, deleteElectricity, calcElectricity } from './notion.js'
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
 
 const OWNER_IDS = (import.meta.env.VITE_OWNER_IDS||'').split(',').map(x=>Number(x.trim())).filter(Boolean)
 const MONTHS_UA = ['Січень','Лютий','Березень','Квітень','Травень','Червень','Липень','Серпень','Вересень','Жовтень','Листопад','Грудень']
@@ -46,6 +45,7 @@ button:active:not(:disabled){transform:scale(.965)}
 @keyframes dotIn{from{transform:scale(.6);opacity:0}to{transform:scale(1);opacity:1}}
 @keyframes spark{0%{transform:translate(0,0) scale(.3);opacity:1}100%{transform:translate(var(--dx),var(--dy)) scale(1);opacity:0}}
 @keyframes barGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes barUp{from{transform:scaleY(0)}to{transform:scaleY(1)}}
 @keyframes navIn{from{transform:translate(-50%,28px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 @keyframes toastIn{from{transform:translate(-50%,12px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 @keyframes prog{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
@@ -61,6 +61,7 @@ button:active:not(:disabled){transform:scale(.965)}
 .check{stroke-dasharray:24;stroke-dashoffset:24;animation:drawCheck .4s .05s ease-out forwards}
 .hero-dot{animation:dotIn .6s cubic-bezier(.2,.9,.3,1.2) both}
 .spark{position:absolute;left:-3px;top:-3px;width:7px;height:7px;border-radius:2px;background:#ffd60a;transform:rotate(45deg);animation:spark .7s ease-out forwards}
+.bary{transform-box:fill-box;transform-origin:50% 100%;animation:barUp .5s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*14ms)}
 .barx{height:100%;transform-origin:left;animation:barGrow .55s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*45ms)}
 .navbar{animation:navIn .4s .1s cubic-bezier(.2,.9,.25,1) both}
 .toast{animation:toastIn .25s ease-out both}
@@ -78,6 +79,7 @@ const vibrate = (type='light') => {
     const h = window.Telegram?.WebApp?.HapticFeedback
     if (!h) return
     if (type==='success'||type==='error'||type==='warning') h.notificationOccurred(type)
+    else if (type==='select') h.selectionChanged()
     else h.impactOccurred(type)
   } catch(e){}
 }
@@ -270,6 +272,99 @@ function MonthPicker({year,month,onChange}) {
   return <div style={{display:'flex'}}><MonthSwitch year={year} month={month} onChange={onChange}/></div>
 }
 
+// ── Графіки: прості SVG-стовпці з осями, підписами та вибором стовпця ─────
+const MONTHS_GEN = ['січня','лютого','березня','квітня','травня','червня','липня','серпня','вересня','жовтня','листопада','грудня']
+const WD_UA = ['Нд','Пн','Вт','Ср','Чт','Пт','Сб']
+const kfmt = v => v>=1000 ? `${+(v/1000).toFixed(1)}к`.replace('.',',') : String(Math.round(v))
+const num1 = v => String(+Number(v||0).toFixed(1))
+const niceScale = (max, maxTicks=4) => {
+  const m = Math.max(max,1), raw = m/maxTicks, pow = Math.pow(10,Math.floor(Math.log10(raw)))
+  const step = [1,2,2.5,5,10].map(k=>k*pow).find(x=>x>=raw)
+  const top = Math.ceil(m/step-1e-9)*step, ticks = []
+  for (let v=0; v<=top+1e-9; v+=step) ticks.push(+v.toFixed(4))
+  return {top,ticks}
+}
+
+function BarsChart({data,height=176,minTop=0,threshold,thresholdLabel,unit,tickFmt=v=>v,valueFmt=v=>v,detail,hint,legend,label}) {
+  const [sel,setSel] = useState(null)
+  const W=340, padL=34, padR=6, padT=18, padB=22
+  const plotW=W-padL-padR, plotH=height-padT-padB
+  const {top,ticks} = niceScale(Math.max(minTop,...data.map(d=>d.v),0))
+  const slot = plotW/Math.max(1,data.length)
+  const bw = Math.max(4,Math.min(26,slot*.62))
+  const y = v => padT+plotH-(v/top)*plotH
+  const y0 = padT+plotH
+  const labelAll = slot>=20
+  const pick = (e,down) => {
+    const r = e.currentTarget.getBoundingClientRect()
+    const i = Math.floor(((e.clientX-r.left)/r.width*W-padL)/slot)
+    if (i<0||i>=data.length) return
+    if (down&&i===sel) { setSel(null); return }
+    if (i!==sel) { vibrate('select'); setSel(i) }
+  }
+  return <div>
+    <svg viewBox={`0 0 ${W} ${height}`} width="100%" style={{display:'block',touchAction:'pan-y',userSelect:'none',WebkitUserSelect:'none'}} role="img" aria-label={label}
+      onPointerDown={e=>pick(e,true)} onPointerMove={e=>{ if (e.buttons) pick(e,false) }}>
+      {unit&&<text x={padL-6} y={9} textAnchor="end" fontSize="10" fill={C.muted}>{unit}</text>}
+      {ticks.map(t=><g key={t}>
+        <line x1={padL} x2={W-padR} y1={y(t)} y2={y(t)} stroke={t===0?'rgba(23,23,23,.28)':'rgba(23,23,23,.08)'} strokeWidth="1"/>
+        <text x={padL-6} y={y(t)+3.5} textAnchor="end" fontSize="10" fill={C.muted}>{tickFmt(t)}</text>
+      </g>)}
+      {data.map((d,i)=>d.off&&<rect key={'o'+i} x={padL+i*slot} y={padT} width={slot} height={plotH} fill="rgba(23,23,23,.05)"/>)}
+      {sel!==null&&<rect x={padL+sel*slot} y={padT} width={slot} height={plotH} fill="rgba(23,23,23,.09)"/>}
+      {threshold!=null&&threshold<=top&&<g>
+        <line x1={padL} x2={W-padR} y1={y(threshold)} y2={y(threshold)} stroke={C.ink} strokeOpacity=".6" strokeDasharray="4 3" strokeWidth="1.2"/>
+        {thresholdLabel&&<text x={padL+4} y={y(threshold)-4} fontSize="10" fontWeight="700" fill={C.ink} stroke="#fff" strokeWidth="3" paintOrder="stroke">{thresholdLabel}</text>}
+      </g>}
+      {data.map((d,i)=>{
+        if (!(d.v>0)) return null
+        const x = padL+i*slot+(slot-bw)/2, yt = y(d.v), h = y0-yt, r = Math.min(3,bw/2,h)
+        return <path key={'b'+i} className="bary" style={{'--i':i}} d={`M${x},${y0}V${yt+r}Q${x},${yt} ${x+r},${yt}H${x+bw-r}Q${x+bw},${yt} ${x+bw},${yt+r}V${y0}Z`}
+          fill={d.hi?C.yellow:C.ink} stroke={sel===i?C.ink:d.hi?'rgba(23,23,23,.25)':'none'} strokeWidth={sel===i?1.6:1}/>
+      })}
+      {data.map((d,i)=>d.v>0&&(labelAll||sel===i)&&<text key={'v'+i} x={padL+i*slot+slot/2} y={y(d.v)-4} textAnchor="middle" fontSize="10" fontWeight="700" fill={C.ink}>{valueFmt(d.v)}</text>)}
+      {data.map((d,i)=>d.showX!==false&&<text key={'x'+i} x={padL+i*slot+slot/2} y={height-6} textAnchor="middle" fontSize="10" fontWeight={sel===i?800:400} fill={sel===i?C.ink:C.muted}>{d.x}</text>)}
+    </svg>
+    {detail&&<div key={sel===null?'hint':sel} className="fade-in" style={{marginTop:8,minHeight:44,display:'flex',flexDirection:'column',justifyContent:'center',gap:2,background:'rgba(23,23,23,.05)',borderRadius:14,padding:'9px 12px',fontSize:13,color:sel===null?C.muted:C.ink,fontWeight:sel===null?500:600}}>
+      {sel===null?hint:detail(data[sel],sel)}
+    </div>}
+    {legend&&<div style={{display:'flex',flexWrap:'wrap',gap:'6px 14px',marginTop:10,fontSize:12,color:C.dim}}>
+      {legend.map(l=><span key={l.t} style={{display:'inline-flex',alignItems:'center',gap:6}}>
+        {l.dash
+          ? <span style={{width:16,borderTop:`1.5px dashed ${C.ink}`}}/>
+          : <span style={{width:10,height:10,borderRadius:3,background:l.c,boxShadow:l.line?'inset 0 0 0 1px rgba(23,23,23,.2)':'none'}}/>}
+        {l.t}
+      </span>)}
+    </div>}
+  </div>
+}
+
+function HoursChart({w,year,month,cfg}) {
+  const th = w.eLongHours||cfg?.longDayHours||10
+  const now = new Date()
+  const isCur = year===now.getFullYear()&&month===now.getMonth()
+  const byDay = {}
+  ;(w.days||[]).forEach(d=>{ byDay[Number(d.date.slice(8,10))] = d })
+  const maxDay = Math.max(0,...Object.keys(byDay).map(Number))
+  const last = isCur ? Math.max(now.getDate(),maxDay) : new Date(year,month+1,0).getDate()
+  const data = Array.from({length:last},(_,i)=>{
+    const day = i+1, d = byDay[day], v = d?d.hours:0
+    const wd = new Date(year,month,day).getDay()
+    return {day,d,v,wd,x:String(day),hi:v>=th,off:wd===0,
+      showX: last<=16 || day===1 || day%5===0 || (day===last&&(last%5===0||last%5>=3))}
+  })
+  return <BarsChart data={data} height={184} minTop={th*1.15} threshold={th} thresholdLabel={`${th} год: бонус`} unit="год"
+    valueFmt={num1} label={`Години по днях, ${MONTHS_UA[month]}`}
+    hint="Торкнись стовпчика або проведи пальцем по графіку"
+    detail={d=><>
+      <b style={{fontSize:14}}>{WD_UA[d.wd]}, {d.day} {MONTHS_GEN[month]}</b>
+      {d.d
+        ? <span style={{fontWeight:500}}>{fmtH(d.d.hours)} год{d.d.packs>0?` · ${d.d.packs} ${plural(d.d.packs,'пачка','пачки','пачок')}`:''}{d.hi?' · довгий день':''}</span>
+        : <span style={{fontWeight:500,color:C.muted}}>{d.wd===0?'Вихідний':'Немає запису'}</span>}
+    </>}
+    legend={[{c:C.ink,t:`до ${th} год`},{c:C.yellow,line:true,t:`${th}+ год`},{c:'rgba(23,23,23,.07)',line:true,t:'неділя'}]}/>
+}
+
 const TTip = ({active,payload,label}) => {
   if (!active||!payload?.length) return null
   return <div style={{background:'#ffffff',border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 14px',fontSize:12}}>
@@ -292,7 +387,7 @@ function DaysExpand({days,rateHour,ratePack,longDayHours=10,onEdit,isOwner}) {
         const isLong = d.hours>=longDayHours
         return <div key={d.date} style={{background:C.surface2,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 14px',fontSize:12}}>
           <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-            <span style={{color:isLong?C.gold:C.dim}}>{d.date} {isLong?'':''}</span>
+            <span style={{color:C.dim}}>{d.date}{isLong&&<span style={{background:C.yellow,color:C.ink,borderRadius:8,padding:'1px 7px',fontSize:11,fontWeight:800,marginLeft:8}}>{longDayHours}+ год</span>}</span>
             <div style={{display:'flex',gap:8,alignItems:'center'}}>
               <span style={{color:C.green,fontWeight:600}}>{fmt(earn)} ₴</span>
               {isOwner&&onEdit&&<button onClick={()=>onEdit(d)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.accent,borderRadius:4,padding:'2px 6px',fontSize:11.5,cursor:'pointer',fontFamily:'inherit'}}><Ico n="edit" s={16}/></button>}
@@ -2107,29 +2202,18 @@ function MonthlyStats({tgId,name,onBack}) {
     <Header title="Статистика" sub={name} onBack={onBack}/>
     <div style={{padding:'16px 16px 0',display:'flex',flexDirection:'column',gap:14}}>
       <Card>
-        <SecTitle>ЗАРОБІТОК ПО МІСЯЦЯХ</SecTitle>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={stats} margin={{left:-24}}>
-            <CartesianGrid strokeDasharray="3 3" stroke={C.border2}/>
-            <XAxis dataKey="month" stroke={C.muted} fontSize={10}/>
-            <YAxis stroke={C.muted} fontSize={9} tickFormatter={v=>`${v/1000}к`}/>
-            <Tooltip formatter={v=>`${fmt(v)} ₴`} contentStyle={{background:'#ffffff',border:`1px solid ${C.border}`,borderRadius:8,fontSize:12}}/>
-            <Bar dataKey="earned" name="Заробіток" fill={C.accent} radius={[4,4,0,0]}/>
-          </BarChart>
-        </ResponsiveContainer>
+        <SecTitle>Заробіток по місяцях</SecTitle>
+        <BarsChart data={stats.map((s,i)=>({x:s.month,v:s.earned,hi:i===stats.length-1}))} height={190} unit="₴" tickFmt={kfmt} valueFmt={kfmt}
+          label="Заробіток по місяцях" hint="Торкнись стовпчика, щоб побачити місяць"
+          detail={(d,i)=><><b style={{fontSize:14}}>{MONTHS_UA[stats[i].monthIdx]} {stats[i].year}</b><span style={{fontWeight:500}}>{fmt(stats[i].earned)} ₴ · {fmtH(stats[i].hours)} год</span></>}
+          legend={[{c:C.ink,t:'Минулі місяці'},{c:C.yellow,line:true,t:'Поточний'}]}/>
       </Card>
 
       <Card>
-        <SecTitle>ГОДИНИ ПО МІСЯЦЯХ</SecTitle>
-        <ResponsiveContainer width="100%" height={140}>
-          <LineChart data={stats} margin={{left:-24}}>
-            <CartesianGrid strokeDasharray="3 3" stroke={C.border2}/>
-            <XAxis dataKey="month" stroke={C.muted} fontSize={10}/>
-            <YAxis stroke={C.muted} fontSize={9}/>
-            <Tooltip formatter={v=>`${v} год`} contentStyle={{background:'#ffffff',border:`1px solid ${C.border}`,borderRadius:8,fontSize:12}}/>
-            <Line type="monotone" dataKey="hours" name="Годин" stroke={C.gold} strokeWidth={2} dot={{fill:C.gold,r:3}}/>
-          </LineChart>
-        </ResponsiveContainer>
+        <SecTitle>Години по місяцях</SecTitle>
+        <BarsChart data={stats.map((s,i)=>({x:s.month,v:s.hours,hi:i===stats.length-1}))} height={170} unit="год" tickFmt={v=>v} valueFmt={v=>String(Math.round(v))}
+          label="Години по місяцях" hint="Торкнись стовпчика, щоб побачити місяць"
+          detail={(d,i)=><><b style={{fontSize:14}}>{MONTHS_UA[stats[i].monthIdx]} {stats[i].year}</b><span style={{fontWeight:500}}>{fmtH(stats[i].hours)} год · {stats[i].packs} {plural(stats[i].packs,'пачка','пачки','пачок')}</span></>}/>
       </Card>
 
       <Card>
@@ -2164,11 +2248,6 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
 
   if (showStats) return <MonthlyStats tgId={w.tgId} name={w.name} onBack={()=>setShowStats(false)}/>
 
-  const hoursChart = (w.days||[]).map(d=>({
-    day:d.date.slice(8),
-    normal:d.hours<(cfg?.longDayHours||10)?d.hours:0,
-    long:d.hours>=(cfg?.longDayHours||10)?d.hours:0,
-  }))
 
   return <div className="view-in" style={{minHeight:'100vh',background:C.bg,paddingBottom:40}}>
     <Header title={w.name} sub={w.type==='fixed'?(w.role||'Фіксована'):'Погодинний + пачки'} onBack={onBack}
@@ -2210,38 +2289,12 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
       </div>
 
       {w.type==='shift'&&<>
-        {hoursChart.length>0&&<Card>
-          <SecTitle>Години по днях · ★ = 10+</SecTitle>
-          <ResponsiveContainer width="100%" height={140}>
-            <BarChart data={hoursChart} barSize={12} margin={{left:-24}}>
-              <CartesianGrid strokeDasharray="3 3" stroke={C.border2}/>
-              <XAxis dataKey="day" stroke={C.muted} fontSize={9}/>
-              <YAxis stroke={C.muted} fontSize={9} domain={[0,14]}/>
-              <Tooltip formatter={v=>`${v} год`} contentStyle={{background:'#ffffff',border:`1px solid ${C.border}`,borderRadius:8,fontSize:12}}/>
-              <Bar dataKey="normal" name="Год." stackId="a" fill={C.accent}/>
-              <Bar dataKey="long" name="10+" stackId="a" fill={C.yellow} radius={[3,3,0,0]}/>
-            </BarChart>
-          </ResponsiveContainer>
+        {(w.days||[]).length>0&&<Card>
+          <SecTitle>Години по днях</SecTitle>
+          <HoursChart w={w} year={year} month={month} cfg={cfg}/>
         </Card>}
 
-        <Card>
-          <SecTitle>ПРОГРЕС</SecTitle>
-          {[
-            {l:'Робочі дні', val:w.workDays, max:cfg?.premiumDays||21, c:C.accent, s:`${w.workDays}/${cfg?.premiumDays||21}`},
-            {l:'Довгих днів', val:w.longDays, max:cfg?.longDaysNeeded||10, c:C.gold, s:`${w.longDays}/${cfg?.longDaysNeeded||10}`},
-            {l:'Суботи', val:w.saturdays, max:4, c:C.purple, s:`${w.saturdays} шт`},
-          ].map(p=><div key={p.l} style={{marginBottom:11}}>
-            <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:12}}>
-              <span style={{color:C.dim}}>{p.l}</span><span style={{color:p.c,fontWeight:600}}>{p.s}</span>
-            </div>
-            <Prog val={p.val} max={p.max} color={p.c}/>
-          </div>)}
-          <div style={{marginTop:6,fontSize:12,display:'flex',flexDirection:'column',gap:5}}>
-            {!w.bonusActive?<span style={{color:C.gold}}>До бонусів: ще {w.daysToBonus} {plural(w.daysToBonus,'день','дні','днів')}</span>:<span style={{color:C.green}}>Бонуси активні!</span>}
-            {w.bonusActive&&w.longToBonus>0?<span style={{color:C.gold}}>До бонусу: ще {w.longToBonus} {plural(w.longToBonus,'день','дні','днів')}</span>:w.bonusActive?<span style={{color:C.green}}>Бонус: +{fmt(w.bonusLong)} ₴</span>:null}
-            {w.daysToPremium>0?<span style={{color:C.purple}}>До премії: ще {w.daysToPremium} {plural(w.daysToPremium,'день','дні','днів')}</span>:<span style={{color:C.green}}>Премія: +{fmt(w.premium)} ₴</span>}
-          </div>
-        </Card>
+        <ProgressCard w={w}/>
       </>}
 
       <Card>
@@ -2308,6 +2361,50 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
 // ================================================================
 // OWNER DASHBOARD
 // ================================================================
+function Meter({val,max,done,off}) {
+  const pct = max>0 ? Math.min(100,val/max*100) : 0
+  return <div style={{height:10,borderRadius:5,background:'rgba(23,23,23,.08)',overflow:'hidden'}}>
+    <div style={{height:'100%',width:`${pct}%`,borderRadius:5,background:off?'rgba(23,23,23,.25)':done?C.green:C.yellow,transition:'width .5s cubic-bezier(.2,.8,.2,1)'}}/>
+  </div>
+}
+function Goal({title,status,statusColor,val,max,done,off,note}) {
+  return <div style={{display:'flex',flexDirection:'column',gap:7}}>
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',gap:12}}>
+      <div style={{fontSize:14,fontWeight:700,color:off?C.muted:C.ink}}>{title}</div>
+      <div style={{fontSize:13,fontWeight:800,color:statusColor||C.ink,whiteSpace:'nowrap'}}>{status}</div>
+    </div>
+    {max>0&&<Meter val={val} max={max} done={done} off={off}/>}
+    {note&&<div style={{fontSize:12,color:C.muted,lineHeight:1.4}}>{note}</div>}
+  </div>
+}
+function ProgressCard({w}) {
+  const dw = n => `${n} ${plural(n,'день','дні','днів')}`
+  const wd = n => `${n} ${plural(n,'робочий день','робочі дні','робочих днів')}`
+  const bonusDone = w.bonusActive
+  const longDone  = w.bonusActive && w.longDays>=w.eLongNeed
+  const premDone  = w.workDays>=w.ePremDays
+  return <Card>
+    <SecTitle>Прогрес до бонусів</SecTitle>
+    <div style={{display:'flex',flexDirection:'column',gap:18}}>
+      <Goal title="Бонуси" off={w.bonusOff}
+        status={w.bonusOff?'вимкнено':bonusDone?'відкриті':`ще ${dw(w.daysToBonus)}`} statusColor={w.bonusOff?C.muted:bonusDone?C.green:C.ink}
+        val={w.workDays} max={w.eMinDays} done={bonusDone}
+        note={`Відкриваються після ${wd(w.eMinDays)} за місяць, зараз ${w.workDays}. Неділі не рахуються.`}/>
+      <Goal title={`Довгі дні від ${w.eLongHours} год`} off={w.bonusOff}
+        status={w.bonusOff?'вимкнено':longDone?`+${fmt(w.bonusLong)} ₴`:w.longDays>=w.eLongNeed?'чекає на бонуси':`${w.longDays} з ${w.eLongNeed}`} statusColor={w.bonusOff?C.muted:longDone?C.green:C.ink}
+        val={w.longDays} max={w.eLongNeed} done={longDone}
+        note={`Коли таких днів буде ${w.eLongNeed}, кожен дає +${fmt(w.eLongBonus)} ₴. Зараз ${w.longDays}.`}/>
+      <Goal title={`Премія ${fmt(w.ePremAmt)} ₴`} off={w.premiumOff}
+        status={w.premiumOff?'вимкнено':premDone?`+${fmt(w.premium)} ₴`:`ще ${dw(w.daysToPremium)}`} statusColor={w.premiumOff?C.muted:premDone?C.green:C.ink}
+        val={w.workDays} max={w.ePremDays} done={premDone}
+        note={`Потрібно ${wd(w.ePremDays)} за місяць, зараз ${w.workDays}.`}/>
+      <Goal title="Суботи" off={w.bonusOff}
+        status={w.bonusOff?'вимкнено':`${w.saturdays} шт${w.bonusSat>0?` · +${fmt(w.bonusSat)} ₴`:''}`} statusColor={w.bonusOff?C.muted:w.bonusSat>0?C.green:C.ink}
+        note={`+${fmt(w.eSatBonus)} ₴ за кожну суботу, коли бонуси відкриті.`}/>
+    </div>
+  </Card>
+}
+
 function PayHero({w,month}) {
   const receipt = [
     ['Нараховано', w.gross, false],
@@ -2523,11 +2620,6 @@ function WorkerView({tgId,data,onRefresh,loading,busy}) {
 
   if (showStats) return <MonthlyStats tgId={tgId} name={w.name} onBack={()=>setShowStats(false)}/>
 
-  const hoursChart = (w.days||[]).map(d=>({
-    day:d.date.slice(8),
-    normal:d.hours<(cfg?.longDayHours||10)?d.hours:0,
-    long:d.hours>=(cfg?.longDayHours||10)?d.hours:0,
-  }))
 
   const topBar = <TopBar title={w.name||'Мій кабінет'} year={year} month={month} onMonth={onMonthChange} onRefresh={()=>onRefresh(year,month)} busy={busy}/>
 
@@ -2583,39 +2675,12 @@ function WorkerView({tgId,data,onRefresh,loading,busy}) {
         {w.fuelAccess&&<Tile n="fuel" label="Внести паливо" wide onClick={()=>setView('fuel')}/>}
       </div>
 
-      {hoursChart.length>0&&<Card>
-        <SecTitle>Години по днях · ★ = 10+</SecTitle>
-        <ResponsiveContainer width="100%" height={140}>
-          <BarChart data={hoursChart} barSize={12} margin={{left:-24}}>
-            <CartesianGrid strokeDasharray="3 3" stroke={C.border2}/>
-            <XAxis dataKey="day" stroke={C.muted} fontSize={9}/>
-            <YAxis stroke={C.muted} fontSize={9} domain={[0,14]}/>
-            <Tooltip formatter={v=>`${v} год`} contentStyle={{background:'#ffffff',border:`1px solid ${C.border}`,borderRadius:8,fontSize:12}}/>
-            <Bar dataKey="normal" name="Год." stackId="a" fill={C.accent}/>
-            <Bar dataKey="long" name="10+" stackId="a" fill={C.yellow} radius={[3,3,0,0]}/>
-          </BarChart>
-        </ResponsiveContainer>
+      {(w.days||[]).length>0&&<Card>
+        <SecTitle>Години по днях</SecTitle>
+        <HoursChart w={w} year={year} month={month} cfg={cfg}/>
       </Card>}
 
-      <Card>
-        <SecTitle>ПРОГРЕС І БОНУСИ</SecTitle>
-        {[
-          {l:'Робочі дні', val:w.workDays, max:cfg?.premiumDays||21, c:C.accent, s:`${w.workDays}/${cfg?.premiumDays||21}`},
-          {l:'Довгих днів', val:w.longDays, max:cfg?.longDaysNeeded||10, c:C.gold, s:`${w.longDays}/${cfg?.longDaysNeeded||10}`},
-          {l:'Суботи', val:w.saturdays, max:4, c:C.purple, s:`${w.saturdays} шт`},
-        ].map(p=><div key={p.l} style={{marginBottom:11}}>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:4,fontSize:12}}>
-            <span style={{color:C.dim}}>{p.l}</span><span style={{color:p.c,fontWeight:600}}>{p.s}</span>
-          </div>
-          <Prog val={p.val} max={p.max} color={p.c}/>
-        </div>)}
-        <div style={{marginTop:8,display:'flex',flexDirection:'column',gap:6,fontSize:12}}>
-          {!w.bonusActive?<div style={{color:C.gold,background:`${C.gold}11`,borderRadius:14,padding:'10px 14px'}}>До бонусів: ще {w.daysToBonus} {plural(w.daysToBonus,'день','дні','днів')}</div>:<div style={{color:C.green,background:`${C.green}11`,borderRadius:14,padding:'10px 14px'}}>Бонуси активні!</div>}
-          {w.bonusActive&&w.longToBonus>0?<div style={{color:C.gold,background:`${C.gold}11`,borderRadius:14,padding:'10px 14px'}}>До бонусу: ще {w.longToBonus} {plural(w.longToBonus,'день','дні','днів')} по 10+ год</div>:w.bonusActive?<div style={{color:C.green,background:`${C.green}11`,borderRadius:14,padding:'10px 14px'}}>Бонус: +{fmt(w.bonusLong)} ₴ ({w.longDays}×{fmt(cfg?.bonusPerLongDay||100)})</div>:null}
-          {w.bonusActive&&w.saturdays>0&&<div style={{color:C.purple,background:`${C.purple}11`,borderRadius:14,padding:'10px 14px'}}>Бонус суботи: +{fmt(w.bonusSat)} ₴</div>}
-          {w.daysToPremium>0?<div style={{color:C.purple,background:`${C.purple}11`,borderRadius:14,padding:'10px 14px'}}>До премії: ще {w.daysToPremium} {plural(w.daysToPremium,'день','дні','днів')}</div>:<div style={{color:C.green,background:`${C.green}11`,borderRadius:14,padding:'10px 14px'}}>Премія: +{fmt(w.premium)} ₴</div>}
-        </div>
-      </Card>
+      <ProgressCard w={w}/>
 
       <Card>
         <SecTitle>РОЗБИВКА</SecTitle>
