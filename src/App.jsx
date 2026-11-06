@@ -353,7 +353,7 @@ function HoursChart({w,year,month,cfg}) {
     return {day,d,v,wd,x:String(day),hi:v>=th,off:wd===0,
       showX: last<=16 || day===1 || day%5===0 || (day===last&&(last%5===0||last%5>=3))}
   })
-  return <BarsChart data={data} height={184} minTop={th*1.15} threshold={th} thresholdLabel={`${th} год: бонус`} unit="год"
+  return <BarsChart data={data} height={184} minTop={th*1.15} threshold={th} thresholdLabel={`від ${th} год: бонус`} unit="год"
     valueFmt={num1} label={`Години по днях, ${MONTHS_UA[month]}`}
     hint="Торкнись стовпчика або проведи пальцем по графіку"
     detail={d=><>
@@ -362,7 +362,7 @@ function HoursChart({w,year,month,cfg}) {
         ? <span style={{fontWeight:500}}>{fmtH(d.d.hours)} год{d.d.packs>0?` · ${d.d.packs} ${plural(d.d.packs,'пачка','пачки','пачок')}`:''}{d.hi?' · довгий день':''}</span>
         : <span style={{fontWeight:500,color:C.muted}}>{d.wd===0?'Вихідний':'Немає запису'}</span>}
     </>}
-    legend={[{c:C.ink,t:`до ${th} год`},{c:C.yellow,line:true,t:`${th}+ год`},{c:'rgba(23,23,23,.07)',line:true,t:'неділя'}]}/>
+    legend={[{c:C.ink,t:`менше ${th} год`},{c:C.yellow,line:true,t:`від ${th} год`},{c:'rgba(23,23,23,.07)',line:true,t:'неділя'}]}/>
 }
 
 const TTip = ({active,payload,label}) => {
@@ -387,7 +387,7 @@ function DaysExpand({days,rateHour,ratePack,longDayHours=10,onEdit,isOwner}) {
         const isLong = d.hours>=longDayHours
         return <div key={d.date} style={{background:C.surface2,border:`1px solid ${C.border}`,borderRadius:8,padding:'10px 14px',fontSize:12}}>
           <div style={{display:'flex',justifyContent:'space-between',marginBottom:4}}>
-            <span style={{color:C.dim}}>{d.date}{isLong&&<span style={{background:C.yellow,color:C.ink,borderRadius:8,padding:'1px 7px',fontSize:11,fontWeight:800,marginLeft:8}}>{longDayHours}+ год</span>}</span>
+            <span style={{color:C.dim}}>{d.date}{isLong&&<span style={{background:C.yellow,color:C.ink,borderRadius:8,padding:'1px 7px',fontSize:11,fontWeight:800,marginLeft:8}}>від {longDayHours} год</span>}</span>
             <div style={{display:'flex',gap:8,alignItems:'center'}}>
               <span style={{color:C.green,fontWeight:600}}>{fmt(earn)} ₴</span>
               {isOwner&&onEdit&&<button onClick={()=>onEdit(d)} style={{background:'transparent',border:`1px solid ${C.border}`,color:C.accent,borderRadius:4,padding:'2px 6px',fontSize:11.5,cursor:'pointer',fontFamily:'inherit'}}><Ico n="edit" s={16}/></button>}
@@ -418,7 +418,7 @@ function PayslipModal({w,month,year,onClose}) {
     w.type==='shift'?`💰 Погодинно: ${fmt(w.earnHours)} ₴`:'',
     w.type==='shift'?`📦 Пачки: ${fmt(w.earnPacks)} ₴`:'',
     w.type==='fixed'?`💰 Фікс. ставка: ${fmt(w.gross)} ₴`:'',
-    w.bonusLong>0?`⭐ Бонус 10+ год: +${fmt(w.bonusLong)} ₴`:'',
+    w.bonusLong>0?`⭐ Бонус за довгі дні (від ${w.eLongHours} год): +${fmt(w.bonusLong)} ₴`:'',
     w.bonusSat>0?`📅 Бонус суботи: +${fmt(w.bonusSat)} ₴`:'',
     w.premium>0?`🏆 Премія: +${fmt(w.premium)} ₴`:'',
     w.manualBonus>0?`🎁 Ручна премія: +${fmt(w.manualBonus)} ₴`:'',
@@ -1006,9 +1006,9 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
 
   const indFields = [
     ['minDaysForBonus','Мін. днів для бонусів',g.minDaysForBonus],
-    ['bonusPerLongDay','Бонус за день 10+ год',g.bonusPerLongDay],
+    ['bonusPerLongDay','Бонус за довгий день',g.bonusPerLongDay],
     ['bonusSaturday','Бонус за суботу',g.bonusSaturday],
-    ['longDayHours','Годин для довгого дня',g.longDayHours],
+    ['longDayHours','Довгий день від (год, включно)',g.longDayHours],
     ['longDaysNeeded','Потрібно довгих днів',g.longDaysNeeded],
     ['premiumDays','Днів для премії',g.premiumDays],
     ['premiumAmount','Сума премії',g.premiumAmount],
@@ -1024,7 +1024,7 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
           <div>
             <Lbl>НАРАХУВАННЯ ВИПЛАТ</Lbl>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
-              <Toggle on={!bonusOff}   onClick={()=>{vibrate('light');setBonusOff(v=>!v)}}     label="Бонуси (10+ год, суботи)" color={C.gold}/>
+              <Toggle on={!bonusOff}   onClick={()=>{vibrate('light');setBonusOff(v=>!v)}}     label="Бонуси (довгі дні, суботи)" color={C.gold}/>
               <Toggle on={!premiumOff} onClick={()=>{vibrate('light');setPremiumOff(v=>!v)}}   label="Премія за місяць" color={C.purple}/>
               <Toggle on={fuelAccess}  onClick={()=>{vibrate('light');setFuelAccess(v=>!v)}}   label="Доступ до внесення палива" color={C.green}/>
             </div>
@@ -1239,7 +1239,7 @@ function SettingsForm({cfg,onClose,onSaved,tgId,tgName,year,month}) {
 
   const fields = [
     {k:'minDaysForBonus', l:'Мін. днів для бонусів'},
-    {k:'longDayHours',    l:'Годин для "довгого дня"'},
+    {k:'longDayHours',    l:'Довгий день: від скількох годин (включно)'},
     {k:'longDaysNeeded',  l:'Потрібно довгих днів'},
     {k:'bonusPerLongDay', l:'Бонус за довгий день (грн)'},
     {k:'bonusSaturday',   l:'Бонус за суботу (грн)'},
@@ -2305,7 +2305,7 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
         {w.type==='shift'&&<>
           <Row label={`Погодинно (${fmtH(w.totalHours)} × ${fmt(w.rateHour)} ₴)`} value={`${fmt(w.earnHours)} ₴`}/>
           <Row label={`Пачки (${w.totalPacks} × ${fmt(w.ratePack)} ₴)`} value={`${fmt(w.earnPacks)} ₴`}/>
-          {w.bonusLong>0&&<Row label={`Бонус 10+ год (${w.longDays}×)`} value={`+${fmt(w.bonusLong)} ₴`} color={C.gold}/>}
+          {w.bonusLong>0&&<Row label={`Бонус за довгі дні від ${w.eLongHours} год (${w.longDays}×)`} value={`+${fmt(w.bonusLong)} ₴`} color={C.gold}/>}
           {w.bonusSat>0&&<Row label={`Бонус суботи (${w.saturdays}×)`} value={`+${fmt(w.bonusSat)} ₴`} color={C.gold}/>}
           {w.premium>0&&<Row label="Премія" value={`+${fmt(w.premium)} ₴`} color={C.green}/>}
           {w.manualBonus>0&&<Row label="Ручні премії" value={`+${fmt(w.manualBonus)} ₴`} color={C.green}/>}
@@ -2326,7 +2326,7 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
 
       {w.type==='shift'&&w.days?.length>0&&<Card>
         <SecTitle>ДЕТАЛІ ПО ДНЯХ</SecTitle>
-        <DaysExpand days={w.days} rateHour={w.rateHour} ratePack={w.ratePack} longDayHours={cfg?.longDayHours} isOwner={isOwner} onEdit={isOwner?setEditDay:null}/>
+        <DaysExpand days={w.days} rateHour={w.rateHour} ratePack={w.ratePack} longDayHours={w.eLongHours||cfg?.longDayHours} isOwner={isOwner} onEdit={isOwner?setEditDay:null}/>
       </Card>}
 
       {w.advances?.length>0&&<Card>
@@ -2689,7 +2689,7 @@ function WorkerView({tgId,data,onRefresh,loading,busy}) {
         </div>}
         <Row label={`Погодинно (${fmtH(w.totalHours)} × ${fmt(w.rateHour)} ₴)`} value={`${fmt(w.earnHours)} ₴`}/>
         <Row label={`Пачки (${w.totalPacks} × ${fmt(w.ratePack)} ₴)`} value={`${fmt(w.earnPacks)} ₴`}/>
-        {w.bonusLong>0&&<Row label="Бонус 10+ год" value={`+${fmt(w.bonusLong)} ₴`} color={C.gold}/>}
+        {w.bonusLong>0&&<Row label={`Бонус за довгі дні від ${w.eLongHours} год`} value={`+${fmt(w.bonusLong)} ₴`} color={C.gold}/>}
         {w.bonusSat>0&&<Row label="Бонус суботи" value={`+${fmt(w.bonusSat)} ₴`} color={C.gold}/>}
         {w.premium>0&&<Row label="Премія" value={`+${fmt(w.premium)} ₴`} color={C.green}/>}
         {w.manualBonus>0&&<Row label="Ручні премії" value={`+${fmt(w.manualBonus)} ₴`} color={C.green}/>}
@@ -2710,7 +2710,7 @@ function WorkerView({tgId,data,onRefresh,loading,busy}) {
 
       {w.days?.length>0&&<Card>
         <SecTitle>МОЇ ДНІ</SecTitle>
-        <DaysExpand days={w.days} rateHour={w.rateHour} ratePack={w.ratePack} longDayHours={cfg?.longDayHours} isOwner={true} onEdit={setWorkerEditDay}/>
+        <DaysExpand days={w.days} rateHour={w.rateHour} ratePack={w.ratePack} longDayHours={w.eLongHours||cfg?.longDayHours} isOwner={true} onEdit={setWorkerEditDay}/>
       </Card>}
     </div>
 

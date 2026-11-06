@@ -84,7 +84,7 @@ function dateFilter(field, year, month) {
 
 export const DEFAULT_CFG = {
   minDaysForBonus: 19, bonusPerLongDay: 100, bonusSaturday: 300,
-  premiumDays: 21, premiumAmount: 4000, longDayHours: 10, longDaysNeeded: 10,
+  premiumDays: 21, premiumAmount: 4000, longDayHours: 11, longDaysNeeded: 10,
   lunchBreak: 1, electricityTariff: 0,
 }
 
