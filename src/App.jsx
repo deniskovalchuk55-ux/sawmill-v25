@@ -314,7 +314,11 @@ function BarsChart({data,height=176,minTop=0,threshold,thresholdLabel,unit,tickF
       {sel!==null&&<rect x={padL+sel*slot} y={padT} width={slot} height={plotH} fill="rgba(23,23,23,.09)"/>}
       {threshold!=null&&threshold<=top&&<g>
         <line x1={padL} x2={W-padR} y1={y(threshold)} y2={y(threshold)} stroke={C.ink} strokeOpacity=".6" strokeDasharray="4 3" strokeWidth="1.2"/>
-        {thresholdLabel&&<text x={padL+4} y={y(threshold)-4} fontSize="10" fontWeight="700" fill={C.ink} stroke="#fff" strokeWidth="3" paintOrder="stroke">{thresholdLabel}</text>}
+        {thresholdLabel&&<g>
+          {/* підпис лінії над графіком, праворуч: не перекривається стовпцями */}
+          <line x1={W-padR-20} x2={W-padR} y1={6} y2={6} stroke={C.ink} strokeOpacity=".6" strokeDasharray="4 3" strokeWidth="1.2"/>
+          <text x={W-padR-26} y={9} textAnchor="end" fontSize="10" fontWeight="700" fill={C.ink}>{thresholdLabel}</text>
+        </g>}
       </g>}
       {data.map((d,i)=>{
         if (!(d.v>0)) return null
@@ -322,7 +326,13 @@ function BarsChart({data,height=176,minTop=0,threshold,thresholdLabel,unit,tickF
         return <path key={'b'+i} className="bary" style={{'--i':i}} d={`M${x},${y0}V${yt+r}Q${x},${yt} ${x+r},${yt}H${x+bw-r}Q${x+bw},${yt} ${x+bw},${yt+r}V${y0}Z`}
           fill={d.hi?C.yellow:C.ink} stroke={sel===i?C.ink:d.hi?'rgba(23,23,23,.25)':'none'} strokeWidth={sel===i?1.6:1}/>
       })}
-      {data.map((d,i)=>d.v>0&&(labelAll||sel===i)&&<text key={'v'+i} x={padL+i*slot+slot/2} y={y(d.v)-4} textAnchor="middle" fontSize="10" fontWeight="700" fill={C.ink}>{valueFmt(d.v)}</text>)}
+      {data.map((d,i)=>{
+        if (!(d.v>0&&(labelAll||sel===i))) return null
+        // якщо підпис потрапляє на пунктир порогу, підкладаємо білий контур, щоб цифри читались
+        const onLine = threshold!=null && Math.abs((y(d.v)-8.5)-y(threshold))<7
+        return <text key={'v'+i} x={padL+i*slot+slot/2} y={y(d.v)-4} textAnchor="middle" fontSize="10" fontWeight="700" fill={C.ink}
+          {...(onLine?{stroke:'#fff',strokeWidth:3,paintOrder:'stroke',strokeLinejoin:'round'}:null)}>{valueFmt(d.v)}</text>
+      })}
       {data.map((d,i)=>d.showX!==false&&<text key={'x'+i} x={padL+i*slot+slot/2} y={height-6} textAnchor="middle" fontSize="10" fontWeight={sel===i?800:400} fill={sel===i?C.ink:C.muted}>{d.x}</text>)}
     </svg>
     {detail&&<div key={sel===null?'hint':sel} className="fade-in" style={{marginTop:8,minHeight:44,display:'flex',flexDirection:'column',justifyContent:'center',gap:2,background:'rgba(23,23,23,.05)',borderRadius:14,padding:'9px 12px',fontSize:13,color:sel===null?C.muted:C.ink,fontWeight:sel===null?500:600}}>
@@ -339,30 +349,60 @@ function BarsChart({data,height=176,minTop=0,threshold,thresholdLabel,unit,tickF
   </div>
 }
 
+// Тумблер з кількох варіантів (у картках, поряд із заголовком)
+function SegToggle({value,onChange,options,label}) {
+  return <div role="group" aria-label={label} style={{display:'inline-flex',background:'rgba(23,23,23,.06)',borderRadius:13,padding:3,gap:2,flexShrink:0}}>
+    {options.map(([k,l])=>{
+      const on = value===k
+      return <button key={k} type="button" aria-pressed={on} onClick={()=>{ if(!on){ vibrate('select'); onChange(k) } }}
+        style={{border:'none',borderRadius:10,padding:'0 13px',height:32,fontSize:13,fontWeight:on?800:600,fontFamily:'inherit',cursor:'pointer',background:on?C.ink:'transparent',color:on?C.yellow:C.dim,transition:'background .18s,color .18s'}}>{l}</button>
+    })}
+  </div>
+}
+
+// Режим графіка годин (тиждень / місяць): пам'ятається, поки застосунок відкритий
+let chartPeriod = 'week'
+
 function HoursChart({w,year,month,cfg}) {
+  const [mode,setModeState] = useState(chartPeriod)
+  const setMode = m => { chartPeriod = m; setModeState(m) }
   const th = w.eLongHours||cfg?.longDayHours||10
   const now = new Date()
   const isCur = year===now.getFullYear()&&month===now.getMonth()
+  const dim = new Date(year,month+1,0).getDate()
   const byDay = {}
   ;(w.days||[]).forEach(d=>{ byDay[Number(d.date.slice(8,10))] = d })
   const maxDay = Math.max(0,...Object.keys(byDay).map(Number))
-  const last = isCur ? Math.max(now.getDate(),maxDay) : new Date(year,month+1,0).getDate()
-  const data = Array.from({length:last},(_,i)=>{
-    const day = i+1, d = byDay[day], v = d?d.hours:0
+  // Тиждень: останні 7 днів (для поточного місяця до сьогодні, для минулого до кінця місяця).
+  // Місяць: усі дні місяця, ще не прожиті дні порожні.
+  const end  = isCur ? Math.min(dim,Math.max(now.getDate(),maxDay)) : dim
+  const from = mode==='week' ? Math.max(1,end-6) : 1
+  const to   = mode==='week' ? end : dim
+  const n    = to-from+1
+  const data = Array.from({length:n},(_,i)=>{
+    const day = from+i, d = byDay[day], v = d?d.hours:0
     const wd = new Date(year,month,day).getDay()
-    return {day,d,v,wd,x:String(day),hi:v>=th,off:wd===0,
-      showX: last<=16 || day===1 || day%5===0 || (day===last&&(last%5===0||last%5>=3))}
+    return {day,d,v,wd,x:String(day),hi:v>=th,off:wd===0,future:isCur&&day>now.getDate(),
+      showX: n<=16 || day===1 || day%5===0 || (day===dim&&(dim%5===0||dim%5>=3))}
   })
-  return <BarsChart data={data} height={184} minTop={th*1.15} threshold={th} thresholdLabel={`від ${th} год: бонус`} unit="год"
-    valueFmt={num1} label={`Години по днях, ${MONTHS_UA[month]}`}
-    hint="Торкнись стовпчика або проведи пальцем по графіку"
-    detail={d=><>
-      <b style={{fontSize:14}}>{WD_UA[d.wd]}, {d.day} {MONTHS_GEN[month]}</b>
-      {d.d
-        ? <span style={{fontWeight:500}}>{fmtH(d.d.hours)} год{d.d.packs>0?` · ${d.d.packs} ${plural(d.d.packs,'пачка','пачки','пачок')}`:''}{d.hi?' · довгий день':''}</span>
-        : <span style={{fontWeight:500,color:C.muted}}>{d.wd===0?'Вихідний':'Немає запису'}</span>}
-    </>}
-    legend={[{c:C.ink,t:`менше ${th} год`},{c:C.yellow,line:true,t:`від ${th} год`},{c:'rgba(23,23,23,.07)',line:true,t:'неділя'}]}/>
+  const total = data.reduce((s,d)=>s+d.v,0)
+  const range = mode==='week'
+    ? (from===to ? `${to} ${MONTHS_GEN[month]}` : `${from}–${to} ${MONTHS_GEN[month]}`)
+    : `${MONTHS_UA[month]} ${year}`
+  return <>
+    <SecTitle right={<SegToggle label="Період графіка" value={mode} onChange={setMode} options={[['week','Тиждень'],['month','Місяць']]}/>}>Години по днях</SecTitle>
+    <div style={{fontSize:12.5,color:C.muted,margin:'-4px 0 8px'}}>{range} · <b style={{color:C.ink}}>{num1(total)} год</b></div>
+    <BarsChart key={`${mode}-${year}-${month}`} data={data} height={184} minTop={th*1.15} threshold={th} thresholdLabel={`від ${th} год: бонус`} unit="год"
+      valueFmt={num1} label={`Години по днях, ${mode==='week'?range:MONTHS_UA[month]}`}
+      hint="Торкнись стовпчика або проведи пальцем по графіку"
+      detail={d=><>
+        <b style={{fontSize:14}}>{WD_UA[d.wd]}, {d.day} {MONTHS_GEN[month]}</b>
+        {d.d
+          ? <span style={{fontWeight:500}}>{num1(d.d.hours)} год{d.d.packs>0?` · ${d.d.packs} ${plural(d.d.packs,'пачка','пачки','пачок')}`:''}{d.hi?' · довгий день':''}</span>
+          : <span style={{fontWeight:500,color:C.muted}}>{d.future?'Ще попереду':d.wd===0?'Вихідний':'Немає запису'}</span>}
+      </>}
+      legend={[{c:C.ink,t:`менше ${th} год`},{c:C.yellow,line:true,t:`від ${th} год`},{c:'rgba(23,23,23,.07)',line:true,t:'неділя'}]}/>
+  </>
 }
 
 const TTip = ({active,payload,label}) => {
@@ -2239,7 +2279,7 @@ function MonthlyStats({tgId,name,onBack}) {
 // ================================================================
 // ДЕТАЛІ РОБІТНИКА
 // ================================================================
-function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,month,year}) {
+function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,month,year,onMonthChange,loading}) {
   const [modal,    setModal]    = useState(null)
   const [editDay,  setEditDay]  = useState(null)
   const [showStats,setShowStats]= useState(false)
@@ -2257,6 +2297,9 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
       </div>}/>
 
     <div style={{padding:'16px 16px 0',display:'flex',flexDirection:'column',gap:14}}>
+      {onMonthChange&&<MonthPicker year={year} month={month} onChange={onMonthChange}/>}
+
+      {loading ? <Skel h={168} r={28}/> : <>
       <PayHero w={w} month={month}/>
 
       {w.daysSinceEntry>=2&&w.type==='shift'&&year===new Date().getFullYear()&&month===new Date().getMonth()&&<div style={{background:`${C.red}11`,border:`1px solid ${C.red}33`,borderRadius:10,padding:'10px 14px',fontSize:12,color:C.red}}>
@@ -2272,6 +2315,7 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
         {w.fines.length>1&&<div style={{borderTop:`1px solid ${C.red}33`,marginTop:6,paddingTop:6,display:'flex',justifyContent:'space-between',fontSize:12,color:C.red,fontWeight:700}}><span>Разом</span><span>-{fmt(w.totalFines)} ₴</span></div>}
         <div style={{fontSize:11.5,color:C.muted,marginTop:6}}>Віднімається від виплати</div>
       </div>}
+      </>}
 
       {/* Мотивація */}
       {!isOwner&&<div style={{background:'rgba(255,214,10,0.28)',borderRadius:16,padding:'12px 14px',fontSize:13,fontWeight:600,color:C.ink,textAlign:'center'}}>{motiv}</div>}
@@ -2288,11 +2332,13 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
         <Tile i={7} n="doc" label="Листок" onClick={()=>setPayslip(true)}/>
       </div>
 
+      {loading ? <><Skel h={290} r={22}/><Skel h={250} r={22}/><Skel h={230} r={22}/></> : <>
       {w.type==='shift'&&<>
-        {(w.days||[]).length>0&&<Card>
-          <SecTitle>Години по днях</SecTitle>
-          <HoursChart w={w} year={year} month={month} cfg={cfg}/>
-        </Card>}
+        {(w.days||[]).length>0
+          ? <Card>
+              <HoursChart w={w} year={year} month={month} cfg={cfg}/>
+            </Card>
+          : <Card><div style={{fontSize:13.5,color:C.muted,textAlign:'center',padding:'8px 0'}}>За {MONTHS_UA[month].toLowerCase()} записів про зміни немає</div></Card>}
 
         <ProgressCard w={w}/>
       </>}
@@ -2343,6 +2389,7 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
         <SecTitle>ПРЕМІЇ</SecTitle>
         {w.bonuses.map((b,i)=><Row key={i} label={b.date} value={`+${fmt(b.amount)} ₴`} color={C.green} sub={b.reason} last={i===w.bonuses.length-1}/>)}
       </Card>}
+      </>}
     </div>
 
     {modal==='shift'  &&<ShiftForm worker={w} allWorkers={allWorkers} isOwner={isOwner} onClose={()=>setModal(null)} onSaved={()=>{onRefresh();setModal(null)}} tgId={tgId} tgName={tgName} cfg={cfg}/>}
@@ -2379,7 +2426,6 @@ function Goal({title,status,statusColor,val,max,done,off,note}) {
 }
 function ProgressCard({w}) {
   const dw = n => `${n} ${plural(n,'день','дні','днів')}`
-  const wd = n => `${n} ${plural(n,'робочий день','робочі дні','робочих днів')}`
   const bonusDone = w.bonusActive
   const longDone  = w.bonusActive && w.longDays>=w.eLongNeed
   const premDone  = w.workDays>=w.ePremDays
@@ -2388,19 +2434,15 @@ function ProgressCard({w}) {
     <div style={{display:'flex',flexDirection:'column',gap:18}}>
       <Goal title="Бонуси" off={w.bonusOff}
         status={w.bonusOff?'вимкнено':bonusDone?'відкриті':`ще ${dw(w.daysToBonus)}`} statusColor={w.bonusOff?C.muted:bonusDone?C.green:C.ink}
-        val={w.workDays} max={w.eMinDays} done={bonusDone}
-        note={`Відкриваються після ${wd(w.eMinDays)} за місяць, зараз ${w.workDays}. Неділі не рахуються.`}/>
+        val={w.workDays} max={w.eMinDays} done={bonusDone}/>
       <Goal title={`Довгі дні від ${w.eLongHours} год`} off={w.bonusOff}
         status={w.bonusOff?'вимкнено':longDone?`+${fmt(w.bonusLong)} ₴`:w.longDays>=w.eLongNeed?'чекає на бонуси':`${w.longDays} з ${w.eLongNeed}`} statusColor={w.bonusOff?C.muted:longDone?C.green:C.ink}
-        val={w.longDays} max={w.eLongNeed} done={longDone}
-        note={`Коли таких днів буде ${w.eLongNeed}, кожен дає +${fmt(w.eLongBonus)} ₴. Зараз ${w.longDays}.`}/>
+        val={w.longDays} max={w.eLongNeed} done={longDone}/>
       <Goal title={`Премія ${fmt(w.ePremAmt)} ₴`} off={w.premiumOff}
         status={w.premiumOff?'вимкнено':premDone?`+${fmt(w.premium)} ₴`:`ще ${dw(w.daysToPremium)}`} statusColor={w.premiumOff?C.muted:premDone?C.green:C.ink}
-        val={w.workDays} max={w.ePremDays} done={premDone}
-        note={`Потрібно ${wd(w.ePremDays)} за місяць, зараз ${w.workDays}.`}/>
+        val={w.workDays} max={w.ePremDays} done={premDone}/>
       <Goal title="Суботи" off={w.bonusOff}
-        status={w.bonusOff?'вимкнено':`${w.saturdays} шт${w.bonusSat>0?` · +${fmt(w.bonusSat)} ₴`:''}`} statusColor={w.bonusOff?C.muted:w.bonusSat>0?C.green:C.ink}
-        note={`+${fmt(w.eSatBonus)} ₴ за кожну суботу, коли бонуси відкриті.`}/>
+        status={w.bonusOff?'вимкнено':`${w.saturdays} шт${w.bonusSat>0?` · +${fmt(w.bonusSat)} ₴`:''}`} statusColor={w.bonusOff?C.muted:w.bonusSat>0?C.green:C.ink}/>
     </div>
   </Card>
 }
@@ -2471,9 +2513,17 @@ function TopBars({items}) {
   </div>
 }
 
+// Ключ працівника, щоб відкрита картка лишалась тією ж людиною після зміни місяця
+const wkey = x => `${x.type||''}:${x.tgId??x.name}`
+// Якщо працівника немає у списку обраного місяця (напр. колишній без картки), показуємо порожню картку замість вильоту на головну
+const blankWorker = s => ({...s,totalHours:0,totalPacks:0,workDays:0,longDays:0,saturdays:0,days:[],earnHours:0,earnPacks:0,base:0,
+  bonusActive:false,bonusLong:0,bonusSat:0,premium:0,manualBonus:0,gross:0,totalAdv:0,debtPaid:0,totalFines:0,fines:[],final:0,
+  daysToBonus:s.eMinDays||0,longToBonus:s.eLongNeed||0,daysToPremium:s.ePremDays||0,lastEntry:null,daysSinceEntry:0,bonuses:[],advances:[],lowRateApplied:false})
+
 function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthChange,loading,busy}) {
   const [view,   setView]   = useState('main')
-  const [detail, setDetail] = useState(null)
+  const [detailId, setDetailId] = useState(null)
+  const snap = useRef(null)
   const [modal,  setModal]  = useState(null)
   const [search, setSearch] = useState('')
   const [tab,    setTab]    = useState('home')
@@ -2499,6 +2549,16 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
     bonus:(w.bonusLong||0)+(w.bonusSat||0)+(w.premium||0)+(w.manualBonus||0),
   }))
 
+  // Картка береться зі списку поточного місяця, тому при зміні місяця в картці дані оновлюються самі
+  let detail = null
+  if (detailId!==null) {
+    detail = workers.find(x=>wkey(x)===detailId) || null
+    if (detail) snap.current = detail
+    else if (snap.current) detail = blankWorker(snap.current)
+  }
+  const openDetail = w => { snap.current = w; setDetailId(wkey(w)) }
+  const closeDetail = () => setDetailId(null)
+
   const refresh = ()=>onRefresh(year,month)
   const back = ()=>setView('main')
   if (view==='debts') return <DebtsView workers={workers} onBack={back} onRefresh={refresh} tgId={tgId} tgName={tgName}/>
@@ -2507,10 +2567,10 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
   if (view==='intake') return <IntakeView onBack={back} tgId={tgId} tgName={tgName} year={year} month={month} onMonthChange={onMonthChange}/>
   if (view==='fuel') return <FuelView onBack={back} tgId={tgId} tgName={tgName} year={year} month={month} onMonthChange={onMonthChange} isOwner={true}/>
   if (view==='electricity') return <ElectricityView onBack={back} tgId={tgId} tgName={tgName} cfg={cfg}/>
-  if (detail) return <WorkerDetail w={detail} allWorkers={workers} isOwner onBack={()=>setDetail(null)} onRefresh={()=>{setDetail(null);refresh()}} tgId={tgId} tgName={tgName} cfg={cfg} month={month} year={year}/>
+  if (detail) return <WorkerDetail w={detail} allWorkers={workers} isOwner onBack={closeDetail} onRefresh={()=>{closeDetail();refresh()}} tgId={tgId} tgName={tgName} cfg={cfg} month={month} year={year} onMonthChange={onMonthChange} loading={loading}/>
 
   const personList = (list) => <div className="stagger" style={{display:'flex',flexDirection:'column',gap:10}}>
-    {list.map((w,i)=><PersonRow key={w.tgId||w.name||i} w={w} i={i} watch={isCurrent} onClick={()=>setDetail(w)}/>)}
+    {list.map((w,i)=><PersonRow key={w.tgId||w.name||i} w={w} i={i} watch={isCurrent} onClick={()=>openDetail(w)}/>)}
   </div>
 
   return <div style={{minHeight:'100vh',background:C.bg,paddingBottom:100}}>
@@ -2676,7 +2736,6 @@ function WorkerView({tgId,data,onRefresh,loading,busy}) {
       </div>
 
       {(w.days||[]).length>0&&<Card>
-        <SecTitle>Години по днях</SecTitle>
         <HoursChart w={w} year={year} month={month} cfg={cfg}/>
       </Card>}
 
