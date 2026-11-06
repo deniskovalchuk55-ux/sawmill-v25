@@ -721,7 +721,6 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
     longDaysNeeded:  wind.longDaysNeeded ?? '',
   })
   const [showInd, setShowInd] = useState(false)
-  const [onlyThis, setOnlyThis] = useState(false)
   const [loading,    setLoading]    = useState(false)
   const [success,    setSuccess]    = useState(false)
   const [error,      setError]      = useState(null)
@@ -752,7 +751,7 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
           }
           Object.keys(ind).forEach(k => add('ind.'+k, nz(ind[k]), nz((worker.ind||{})[k])))
         }
-        await saveSettingChanges(year, month, worker.tgId, changes, onlyThis)
+        await saveSettingChanges(new Date().getFullYear(), new Date().getMonth(), worker.tgId, changes)
         if (!isFixed && fuelAccess !== !!worker.fuelAccess) await updateStaffToggles(worker.staffPageId, {fuelAccess})
       } else if (isFixed) await updateFixedSalary(worker.staffPageId, val)
       else {
@@ -827,7 +826,6 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
           </div>
         </>}
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
-      {historyEnabled()&&<Toggle on={onlyThis} onClick={()=>setOnlyThis(v=>!v)} label="Тільки цей місяць (не змінювати наступні)" color={C.ink}/>}
       <button type="submit" disabled={loading||success} style={{background:success?C.green:C.yellow,color:C.ink,border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit'}}>
         {loading?'Збереження...':success?'✓ Збережено!':'Зберегти'}
       </button>
@@ -985,7 +983,6 @@ function SettingsForm({cfg,onClose,onSaved,tgId,tgName,year,month}) {
   const [success, setSuccess] = useState(false)
   const [error,   setError]   = useState(null)
   const set = (k,v) => setForm(f=>({...f,[k]:Number(v)}))
-  const [onlyThis, setOnlyThis] = useState(false)
 
   async function submit(e) {
     e.preventDefault()
@@ -994,7 +991,7 @@ function SettingsForm({cfg,onClose,onSaved,tgId,tgName,year,month}) {
       if (historyEnabled()) {
         const keys = ['minDaysForBonus','bonusPerLongDay','bonusSaturday','premiumDays','premiumAmount','longDayHours','longDaysNeeded']
         const changes = keys.filter(k=>Number(form[k])!==Number(cfg[k])).map(k=>({param:'cfg.'+k,value:Number(form[k]),old:Number(cfg[k])}))
-        await saveSettingChanges(year, month, null, changes, onlyThis)
+        await saveSettingChanges(new Date().getFullYear(), new Date().getMonth(), null, changes)
         await saveSettings(cfg.pageId, form, ['lunchBreak','electricityTariff'])
       } else await saveSettings(cfg.pageId, form)
       await writeLog({tgId,name:tgName,action:'Налаштування',details:JSON.stringify(form)})
@@ -1020,7 +1017,6 @@ function SettingsForm({cfg,onClose,onSaved,tgId,tgName,year,month}) {
     <form onSubmit={submit} style={{display:'flex',flexDirection:'column',gap:12}}>
       {fields.map(f=><div key={f.k}><Lbl>{f.l}</Lbl><input type="number" step="0.5" value={form[f.k]??''} onChange={e=>set(f.k,e.target.value)} style={inp}/></div>)}
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>⚠ {error}</div>}
-      {historyEnabled()&&<Toggle on={onlyThis} onClick={()=>setOnlyThis(v=>!v)} label="Тільки цей місяць (не змінювати наступні)" color={C.ink}/>}
       <button type="submit" disabled={loading||success} style={{background:success?C.green:C.purple,color:'#fff',border:'none',borderRadius:10,padding:14,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',marginTop:4}}>
         {loading?'Збереження...':success?'✓ Збережено!':'Зберегти'}
       </button>
