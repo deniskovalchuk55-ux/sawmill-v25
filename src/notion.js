@@ -185,8 +185,22 @@ export function applyHistory(data, key, log) {
 }
 
 // changes: [{ param, value }], tgId: null для загальних налаштувань
-export async function saveSettingChanges(year, month, tgId, changes) {
+export async function saveSettingChanges(year, month, tgId, changes, onlyThisMonth = false) {
   const key = monthKey(year, month)
+  if (onlyThisMonth && changes.length) {
+    // «Тільки цей місяць»: для наступного місяця фіксуємо старе значення, якщо там немає власної зміни
+    const nd = new Date(year, month+1)
+    const nextKey = monthKey(nd.getFullYear(), nd.getMonth())
+    const log = await fetchSettingsLog()
+    const restore = changes.filter(c => !log.some(e => e.month===nextKey && (e.tgId??null)===(tgId?Number(tgId):null) && e.param===c.param))
+    await writeSettingEntries(key, tgId, changes)
+    await writeSettingEntries(nextKey, tgId, restore.map(c => ({ param:c.param, value:c.old ?? null })))
+    return
+  }
+  await writeSettingEntries(key, tgId, changes)
+}
+
+async function writeSettingEntries(key, tgId, changes) {
   for (const c of changes) {
     await createPage(DB.settingsLog, {
       'Місяць':     { title:[{ text:{ content:key } }] },
