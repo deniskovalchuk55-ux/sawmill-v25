@@ -3,7 +3,7 @@ import { fetchAllData, fetchMonthlyStats,
          calcAllWorkers, calcSalary, saveShift, updateShift, deleteShift, saveBonusRecord, saveFine,
          saveAdvance, saveDebtPayment, addDebt, addStaff, addFixedStaff,
          updateStaffRates, updateFixedSalary, updateStaffInfo, deleteStaff, deleteWorkerCompletely,
-         updateStaffToggles, saveSettings, checkAccess, writeLog, DEFAULT_CFG,
+         updateStaffToggles, saveSettings, saveSettingChanges, historyEnabled, checkAccess, writeLog, DEFAULT_CFG,
          fetchShipmentRefs, fetchShipmentRows, groupShipments,
          saveShipmentGroup, updateShipmentGroup, deleteShipmentGroup,
          statsByMaterial, statsByFirm, buildShipmentReport,
@@ -699,7 +699,7 @@ function Toggle({on,onClick,label,color}) {
   </div>
 }
 
-function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg}) {
+function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
   const isFixed = worker.type==='fixed'
   const [val,        setVal]        = useState(isFixed?(worker.gross||''):(worker.rateHour||''))
   const [valPack,    setValPack]    = useState(worker.ratePack||'')
@@ -732,7 +732,28 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg}) {
     e.preventDefault()
     try {
       setLoading(true); setError(null)
-      if (isFixed) await updateFixedSalary(worker.staffPageId, val)
+      if (historyEnabled()) {
+        // Історія: зміни діють з обраного місяця й далі, минулі місяці не чіпаємо
+        const nz = v => (v===''||v===null||v===undefined) ? null : Number(v)
+        const changes = []
+        const add = (param, nv, ov) => { if (nv!==ov) changes.push({param, value:nv}) }
+        if (isFixed) add('salary', nz(val), nz(worker.gross))
+        else {
+          add('rateHour', nz(val), nz(worker.rateHourBase ?? worker.rateHour))
+          add('ratePack', nz(valPack), nz(worker.ratePackBase ?? worker.ratePack))
+          add('bonusOff', !!bonusOff, !!worker.bonusOff)
+          add('premiumOff', !!premiumOff, !!worker.premiumOff)
+          add('lowRateOn', !!lowRateOn, !!worker.lowRateOn)
+          if (lowRateOn) {
+            add('lowRateDays', nz(lowRateDays), nz(worker.lowRateDays))
+            add('rateHourLow', nz(rateHourLow), nz(worker.rateHourLow))
+            add('ratePackLow', nz(ratePackLow), nz(worker.ratePackLow))
+          }
+          Object.keys(ind).forEach(k => add('ind.'+k, nz(ind[k]), nz((worker.ind||{})[k])))
+        }
+        await saveSettingChanges(year, month, worker.tgId, changes)
+        if (!isFixed && fuelAccess !== !!worker.fuelAccess) await updateStaffToggles(worker.staffPageId, {fuelAccess})
+      } else if (isFixed) await updateFixedSalary(worker.staffPageId, val)
       else {
         await updateStaffRates(worker.staffPageId, {rateHour:val!==''?val:undefined,ratePack:valPack!==''?valPack:undefined})
         await updateStaffToggles(worker.staffPageId, {bonusOff,premiumOff,fuelAccess,ind,
@@ -956,7 +977,7 @@ function AddWorkerForm({onClose,onSaved,tgId,tgName}) {
 // ================================================================
 // ФОРМА НАЛАШТУВАНЬ
 // ================================================================
-function SettingsForm({cfg,onClose,onSaved,tgId,tgName}) {
+function SettingsForm({cfg,onClose,onSaved,tgId,tgName,year,month}) {
   const [form,    setForm]    = useState({...cfg})
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -967,7 +988,12 @@ function SettingsForm({cfg,onClose,onSaved,tgId,tgName}) {
     e.preventDefault()
     try {
       setLoading(true); setError(null)
-      await saveSettings(cfg.pageId, form)
+      if (historyEnabled()) {
+        const keys = ['minDaysForBonus','bonusPerLongDay','bonusSaturday','premiumDays','premiumAmount','longDayHours','longDaysNeeded']
+        const changes = keys.filter(k=>Number(form[k])!==Number(cfg[k])).map(k=>({param:'cfg.'+k,value:Number(form[k])}))
+        await saveSettingChanges(year, month, null, changes)
+        await saveSettings(cfg.pageId, form, ['lunchBreak','electricityTariff'])
+      } else await saveSettings(cfg.pageId, form)
       await writeLog({tgId,name:tgName,action:'Налаштування',details:JSON.stringify(form)})
       vibrate('medium')
       setSuccess(true)
@@ -2134,7 +2160,7 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
     {modal==='advance'&&<AdvanceForm worker={w} allWorkers={allWorkers} isOwner={isOwner} onClose={()=>setModal(null)} onSaved={()=>{onRefresh();setModal(null)}} tgId={tgId} tgName={tgName}/>}
     {modal==='debt'   &&<AddDebtForm worker={w} allWorkers={allWorkers} onClose={()=>setModal(null)} onSaved={()=>{onRefresh();setModal(null)}} tgId={tgId} tgName={tgName}/>}
     {modal==='debtpay'&&<DebtPaymentForm worker={w} onClose={()=>setModal(null)} onSaved={()=>{onRefresh();setModal(null)}} tgId={tgId} tgName={tgName}/>}
-    {modal==='rates'  &&<RatesForm worker={w} onClose={()=>setModal(null)} onSaved={()=>{onRefresh();setModal(null)}} tgId={tgId} tgName={tgName} cfg={cfg}/>}
+    {modal==='rates'  &&<RatesForm year={year} month={month} worker={w} onClose={()=>setModal(null)} onSaved={()=>{onRefresh();setModal(null)}} tgId={tgId} tgName={tgName} cfg={cfg}/>}
     {modal==='edit'   &&<EditWorkerForm worker={w} onClose={()=>setModal(null)} onSaved={()=>{onBack();onRefresh()}} tgId={tgId} tgName={tgName}/>}
     {editDay&&<EditDayForm day={editDay} worker={w} onClose={()=>setEditDay(null)} onSaved={()=>{onRefresh();setEditDay(null)}} tgId={tgId} tgName={tgName} cfg={cfg}/>}
     {payslip&&<PayslipModal w={w} month={month} year={year} onClose={()=>setPayslip(false)}/>}
@@ -2266,7 +2292,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
     {modal==='bonus'    &&<BonusForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
     {modal==='fine'     &&<FineForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
     {modal==='addworker'&&<AddWorkerForm onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
-    {modal==='settings' &&<SettingsForm cfg={cfg} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
+    {modal==='settings' &&<SettingsForm year={year} month={month} cfg={cfg} onClose={()=>setModal(null)} onSaved={()=>onRefresh(year,month)} tgId={tgId} tgName={tgName}/>}
   </div>
 }
 

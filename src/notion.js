@@ -19,6 +19,7 @@ const DB = {
   intake:       import.meta.env.VITE_DB_INTAKE,
   fuel:         import.meta.env.VITE_DB_FUEL,
   electricity:  import.meta.env.VITE_DB_ELECTRICITY,
+  settingsLog:  import.meta.env.VITE_DB_SETTINGS_LOG,
 }
 
 async function nr(path, method = 'POST', body = null) {
@@ -107,7 +108,7 @@ export async function fetchSettings() {
   } catch { return DEFAULT_CFG }
 }
 
-export async function saveSettings(pageId, cfg) {
+export async function saveSettings(pageId, cfg, onlyKeys) {
   const props = {
     'Мін. днів для бонусів': { number: cfg.minDaysForBonus },
     'Бонус за день 10+ год': { number: cfg.bonusPerLongDay },
@@ -119,13 +120,87 @@ export async function saveSettings(pageId, cfg) {
     'Обід (год)':            { number: cfg.lunchBreak },
     'Тариф електрики':       { number: cfg.electricityTariff ?? 0 },
   }
+  if (onlyKeys) {
+    const map = { lunchBreak:'Обід (год)', electricityTariff:'Тариф електрики' }
+    const only = {}
+    onlyKeys.forEach(k => { if (map[k]) only[map[k]] = props[map[k]] })
+    return pageId && Object.keys(only).length ? updatePage(pageId, only) : undefined
+  }
   if (pageId) return updatePage(pageId, props)
   return createPage(DB.settings, { 'Назва':{ title:[{ text:{ content:'Налаштування' } }] }, ...props })
 }
 
+
+// ════════ ІСТОРІЯ НАЛАШТУВАНЬ (діє з місяця) ═══════════════
+// База «Зміни налаштувань»: Місяць (title, 2026-11), ID (number, порожньо = загальні),
+// Параметр (text), Значення (text, JSON), Дата зміни (date).
+// Для місяця береться остання зміна, не пізніша за цей місяць (окремо для кожної людини і параметра).
+export const historyEnabled = () => !!DB.settingsLog
+const monthKey = (y, m) => `${y}-${String(m+1).padStart(2,'0')}`
+const HIST_CFG = ['minDaysForBonus','bonusPerLongDay','bonusSaturday','premiumDays','premiumAmount','longDayHours','longDaysNeeded']
+
+async function fetchSettingsLog() {
+  if (!DB.settingsLog) return []
+  try {
+    const r = await queryDB(DB.settingsLog)
+    return r.results.map(x => {
+      const q = x.properties
+      let value = null
+      try { value = JSON.parse(p.text(q['Значення'])) } catch {}
+      return { month:p.text(q['Місяць']), tgId:p.numN(q['ID']), param:p.text(q['Параметр']), value, created:x.created_time||'' }
+    }).filter(e => e.month && e.param)
+  } catch { return [] }
+}
+
+function pickEntries(log, key) {
+  // останній запис для кожної пари (ID, параметр) з місяцем <= key
+  const best = new Map()
+  for (const e of log) {
+    if (e.month > key) continue
+    const k = `${e.tgId??'*'}|${e.param}`
+    const cur = best.get(k)
+    if (!cur || e.month > cur.month || (e.month === cur.month && e.created > cur.created)) best.set(k, e)
+  }
+  return best
+}
+
+export function applyHistory(data, key, log) {
+  if (!log.length) return data
+  const best = pickEntries(log, key)
+  const get = (tgId, param) => best.get(`${tgId??'*'}|${param}`)
+  const cfg = { ...data.cfg }
+  HIST_CFG.forEach(k => { const e = get(null, 'cfg.'+k); if (e && e.value!==null) cfg[k] = e.value })
+  const staff = data.staff.map(s => {
+    const o = { ...s, ind:{ ...s.ind } }
+    ;['rateHour','ratePack','bonusOff','premiumOff','lowRateOn','lowRateDays','rateHourLow','ratePackLow'].forEach(k => {
+      const e = get(s.tgId, k); if (e) o[k] = e.value
+    })
+    HIST_CFG.forEach(k => { const e = get(s.tgId, 'ind.'+k); if (e) o.ind[k] = e.value })
+    return o
+  })
+  const fixedStaff = data.fixedStaff.map(f => {
+    const e = get(f.tgId, 'salary'); return e ? { ...f, salary:e.value } : f
+  })
+  return { ...data, cfg, staff, fixedStaff }
+}
+
+// changes: [{ param, value }], tgId: null для загальних налаштувань
+export async function saveSettingChanges(year, month, tgId, changes) {
+  const key = monthKey(year, month)
+  for (const c of changes) {
+    await createPage(DB.settingsLog, {
+      'Місяць':     { title:[{ text:{ content:key } }] },
+      ...(tgId ? { 'ID': { number:Number(tgId) } } : {}),
+      'Параметр':   { rich_text:[{ text:{ content:c.param } }] },
+      'Значення':   { rich_text:[{ text:{ content:JSON.stringify(c.value ?? null) } }] },
+      'Дата зміни': { date:{ start:new Date().toISOString() } },
+    })
+  }
+}
+
 export async function fetchAllData(year, month) {
   const df = f => dateFilter(f, year, month)
-  const [shifts, staff, advances, bonuses, fixedStaff, debts, debtPayments, settings, fines] =
+  const [shifts, staff, advances, bonuses, fixedStaff, debts, debtPayments, settings, fines, settingsLog] =
     await Promise.all([
       queryDB(DB.shifts,       df('Дата')),
       queryDB(DB.staff),
@@ -136,8 +211,9 @@ export async function fetchAllData(year, month) {
       queryDB(DB.debtPayments, df('Дата')),
       fetchSettings(),
       DB.fines ? queryDB(DB.fines, df('Дата')) : Promise.resolve({results:[]}),
+      fetchSettingsLog(),
     ])
-  return {
+  const base = {
     shifts:       shifts.results.map(parseShift),
     staff:        staff.results.map(parseStaff),
     advances:     advances.results.map(parseAdvance),
@@ -148,6 +224,7 @@ export async function fetchAllData(year, month) {
     debtPayments: debtPayments.results.map(parseDP),
     cfg:          settings,
   }
+  return applyHistory(base, monthKey(year, month), settingsLog)
 }
 
 export async function fetchMonthlyStats(tgId, monthsCount = 6) {
@@ -788,7 +865,7 @@ export function calcSalary(tgId, data) {
   const daysSinceEntry = lastEntry ? Math.floor((new Date()-new Date(lastEntry))/(864e5)) : 99
 
   return {
-    tgId, name:si.name||'', rateHour, ratePack, staffPageId:si.id,
+    tgId, name:si.name||'', rateHour, ratePack, rateHourBase:si.rateHour||0, ratePackBase:si.ratePack||0, staffPageId:si.id,
     lowRateOn:si.lowRateOn||false, lowRateDays:si.lowRateDays??19,
     rateHourLow:si.rateHourLow??null, ratePackLow:si.ratePackLow??null,
     lowRateApplied:useLowRate,
