@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { fetchShared, fetchMonthData, assembleData, EMPTY_MONTH, fetchMonthlyStats,
          calcAllWorkers, calcSalary, saveShift, updateShift, deleteShift, saveBonusRecord, saveFine,
          saveAdvance, saveDebtPayment, addDebt, addStaff, addFixedStaff,
@@ -49,10 +50,10 @@ button:active:not(:disabled){transform:scale(.965)}
 @keyframes navIn{from{transform:translate(-50%,28px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 @keyframes toastIn{from{transform:translate(-50%,12px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 @keyframes prog{0%{transform:translateX(-100%)}100%{transform:translateX(300%)}}
-.view-in{animation:rise .32s cubic-bezier(.2,.8,.2,1) both}
+.view-in{animation:rise .32s cubic-bezier(.2,.8,.2,1) backwards}
 .fade-in{animation:fade .28s ease both}
-.sheet-bg{animation:fade .2s ease both}
-.sheet{animation:sheetUp .36s cubic-bezier(.2,.9,.25,1.03) both;max-width:520px;margin:0 auto}
+.sheet-bg{animation:fade .2s ease backwards;overscroll-behavior:contain}
+.sheet{animation:sheetUp .36s cubic-bezier(.2,.9,.25,1.03) backwards;max-width:520px;margin:0 auto;max-height:92vh;max-height:92dvh;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .pop{animation:popIn .18s ease-out both;transform-origin:top left}
 .stagger>*{animation:rise .38s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i,0)*32ms)}
 .skel{background-color:rgba(23,23,23,.07);background-image:linear-gradient(90deg,rgba(23,23,23,0) 0,rgba(23,23,23,.07) 50%,rgba(23,23,23,0) 100%);background-size:240px 100%;background-repeat:no-repeat;animation:shimmer 1.3s linear infinite}
@@ -231,14 +232,37 @@ function AppSkeleton() {
   </div>
 }
 
+// Поки відкрите вікно, сторінка під ним не гортається (лічильник: вікон може бути кілька поспіль).
+// Без position:fixed на body — так не зникає липка шапка і не стрибає екран разом з клавіатурою.
+let scrollLocks = 0, scrollSaved = null
+function lockPageScroll() {
+  if (scrollLocks++ > 0) return
+  const de = document.documentElement, b = document.body
+  const gap = window.innerWidth - de.clientWidth          // ширина смуги прокрутки (десктоп)
+  scrollSaved = { de:de.style.overflow, b:b.style.overflow, pr:b.style.paddingRight }
+  de.style.overflow = 'hidden'; b.style.overflow = 'hidden'
+  if (gap > 0) b.style.paddingRight = gap+'px'
+}
+function unlockPageScroll() {
+  if (scrollLocks === 0 || --scrollLocks > 0) return
+  const de = document.documentElement, b = document.body
+  de.style.overflow = scrollSaved.de; b.style.overflow = scrollSaved.b; b.style.paddingRight = scrollSaved.pr
+}
+
+// Вікно рендериться прямо в <body>, а не всередині екрана. Причина: анімація появи екрана (fill-mode both) після
+// завершення лишала на ньому transform: matrix(1,0,0,1,0,0) замість none, а будь-який transform робить контейнер
+// «рідним» для fixed-нащадків — вікно прив'язувалось до довгої сторінки (сірий екран / вікно, що їде разом зі сторінкою).
 function Sheet({onClose,title,children}) {
-  return <div className="sheet-bg" onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(23,23,23,0.55)',display:'flex',alignItems:'flex-end',zIndex:200}}>
-    <div className="sheet" onClick={e=>e.stopPropagation()} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:'26px 26px 0 0',padding:'20px 20px 44px',width:'100%',maxHeight:'92vh',overflowY:'auto'}}>
-      <div style={{width:40,height:4,background:C.muted,borderRadius:2,margin:'0 auto 16px'}}/>
-      {title&&<div style={{fontSize:19,fontWeight:800,color:C.ink,marginBottom:18,letterSpacing:-.2}}>{stripEmoji(title)}</div>}
-      {children}
-    </div>
-  </div>
+  useEffect(()=>{ lockPageScroll(); return unlockPageScroll },[])
+  return createPortal(
+    <div className="sheet-bg" role="dialog" aria-modal="true" aria-label={title?stripEmoji(title):undefined} onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(23,23,23,0.55)',display:'flex',alignItems:'flex-end',zIndex:200}}>
+      <div className="sheet" onClick={e=>e.stopPropagation()} style={{background:C.surface,border:`1px solid ${C.border}`,borderRadius:'26px 26px 0 0',padding:'20px 20px 44px',width:'100%',overflowY:'auto'}}>
+        <div style={{width:40,height:4,background:C.muted,borderRadius:2,margin:'0 auto 16px'}}/>
+        {title&&<div style={{fontSize:19,fontWeight:800,color:C.ink,marginBottom:18,letterSpacing:-.2}}>{stripEmoji(title)}</div>}
+        {children}
+      </div>
+    </div>,
+    document.body)
 }
 
 function Header({title,sub,onRefresh,onBack,right}) {
@@ -1009,7 +1033,7 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
     try {
       setLoading(true); setError(null)
       if (historyEnabled()) {
-        // Історія: зміни діють з обраного місяця й далі, минулі місяці не чіпаємо
+        // Історія: зміни діють з поточного (справжнього) місяця й далі, минулі місяці не чіпаємо
         const nz = v => (v===''||v===null||v===undefined) ? null : Number(v)
         const changes = []
         const add = (param, nv, ov) => { if (nv!==ov) changes.push({param, value:nv, old:ov}) }
@@ -1054,8 +1078,14 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
     ['premiumAmount','Сума премії',g.premiumAmount],
   ]
 
+  const nowD = new Date()
+  const viewingPast = historyEnabled() && month!=null && (year!==nowD.getFullYear() || month!==nowD.getMonth())
+
   return <Sheet onClose={onClose} title={`Ставки — ${worker.name}`}>
     <form onSubmit={submit} style={{display:'flex',flexDirection:'column',gap:14}}>
+      {viewingPast&&<div style={{background:'rgba(255,214,10,.28)',borderRadius:14,padding:'10px 12px',fontSize:12.5,fontWeight:600,color:C.ink,lineHeight:1.4}}>
+        Зміни діятимуть від поточного місяця ({MONTHS_UA[nowD.getMonth()]}) і далі. {MONTHS_UA[month]} та раніші місяці лишаються як були.
+      </div>}
       {isFixed
         ? <div><Lbl>ФІКСОВАНА ЗАРПЛАТА (грн/міс)</Lbl><input type="number" value={val} onChange={e=>setVal(e.target.value)} placeholder={`Зараз: ${worker.gross||'—'}`} style={inp}/></div>
         : <>
