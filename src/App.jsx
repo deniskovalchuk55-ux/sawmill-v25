@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo, createContext, useContext } from 'react'
 import { createPortal } from 'react-dom'
 import { fetchShared, fetchMonthData, assembleData, EMPTY_MONTH, fetchMonthlyStats,
-         calcAllWorkers, calcSalary, saveShift, updateShift, deleteShift, saveBonusRecord, saveFine,
-         saveAdvance, saveDebtPayment, addDebt, addStaff, addFixedStaff,
+         calcAllWorkers, calcSalary, saveShift, updateShift, deleteShift, saveBonusRecord, saveFine, updateFine, deleteFine,
+         paramLabel, closingEnabled, closeMonth, reopenMonth, autoCloseMonth, saveAdvance, saveDebtPayment, addDebt, addStaff, addFixedStaff,
          updateStaffRates, updateFixedSalary, updateStaffInfo, deleteStaff, deleteWorkerCompletely,
          updateStaffToggles, saveSettings, saveSettingChanges, historyEnabled, checkAccess, writeLog, DEFAULT_CFG,
          fetchShipmentRefs, fetchShipmentRows, groupShipments,
@@ -92,7 +92,7 @@ const C = {
   red:'#e5392f',muted:'#6f6f69',text:'#171717',dim:'#5b5b57',purple:'#6d4fd1',
   w:['#171717','#15803d','#b7791f','#6d4fd1','#e5392f','#0f766e','#2563eb','#be185d'],
 }
-const IC={clock:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/>',star:'<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',ban:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',card:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M15 15h2"/>',box:'<path d="M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10"/>',tree:'<path d="M12 3l6 8h-3l5 7H4l5-7H6z"/><path d="M12 18v3"/>',fuel:'<path d="M5 21V5a2 2 0 012-2h6a2 2 0 012 2v16M5 21h10M15 9h2a2 2 0 012 2v6a1.5 1.5 0 003 0V9l-3-3M8 8h4"/>',bulb:'<path d="M9 18h6M10 21h4M12 3a6 6 0 00-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0012 3z"/>',chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',doc:'<path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7"/>',home:'<path d="M3 11l9-8 9 8v9H3z"/>',user:'<circle cx="10" cy="8" r="4"/><path d="M3 20c0-4 3-6 7-6M18 14v6M15 17h6"/>',wallet:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M15 15h2"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>',refresh:'<path d="M21 12a9 9 0 11-3-6.7L21 8M21 3v5h-5"/>',chev:'<path d="M6 9l6 6 6-6"/>',check:'<path d="M5 12.5l4.5 4.5L19 7"/>',back:'<path d="M15 6l-6 6 6 6"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/>',trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',plus:'<path d="M12 5v14M5 12h14"/>'}
+const IC={clock:'<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M9 2h6"/>',star:'<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/>',ban:'<circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/>',card:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M15 15h2"/>',box:'<path d="M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7M12 11v10"/>',tree:'<path d="M12 3l6 8h-3l5 7H4l5-7H6z"/><path d="M12 18v3"/>',fuel:'<path d="M5 21V5a2 2 0 012-2h6a2 2 0 012 2v16M5 21h10M15 9h2a2 2 0 012 2v6a1.5 1.5 0 003 0V9l-3-3M8 8h4"/>',bulb:'<path d="M9 18h6M10 21h4M12 3a6 6 0 00-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0012 3z"/>',chart:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',doc:'<path d="M6 3h9l4 4v14H6zM14 3v5h5M9 13h7M9 17h7"/>',home:'<path d="M3 11l9-8 9 8v9H3z"/>',user:'<circle cx="10" cy="8" r="4"/><path d="M3 20c0-4 3-6 7-6M18 14v6M15 17h6"/>',wallet:'<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M15 15h2"/>',gear:'<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/>',refresh:'<path d="M21 12a9 9 0 11-3-6.7L21 8M21 3v5h-5"/>',chev:'<path d="M6 9l6 6 6-6"/>',check:'<path d="M5 12.5l4.5 4.5L19 7"/>',back:'<path d="M15 6l-6 6 6 6"/>',edit:'<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/>',trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/>',plus:'<path d="M12 5v14M5 12h14"/>',lock:'<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>'}
 const stripEmoji = t => typeof t==='string' ? t.replace(/^[\p{Extended_Pictographic}\uFE0F\u200D\s]+/u,'') : t
 const Ico = ({n,s=22}) => <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" dangerouslySetInnerHTML={{__html:IC[n]}}/>
 const Tile = ({n,label,onClick,primary,danger,wide,i}) =>
@@ -123,6 +123,63 @@ const Row = ({label,value,color=C.text,bold=false,last=false,sub}) =>
     <div><span style={{color:C.dim}}>{label}</span>{sub&&<div style={{fontSize:11.5,color:C.muted}}>{sub}</div>}</div>
     <span style={{color,fontWeight:bold?700:400,marginLeft:8,textAlign:'right'}}>{value}</span>
   </div>
+// Рядок запису з олівцем для корекції/видалення (лише власник, коли onEdit передано)
+const EditRow = ({onEdit,editLabel,...rest}) =>
+  <div style={{display:'flex',alignItems:'center',gap:6,borderBottom:rest.last?'none':`1px solid ${C.border}`}}>
+    <div style={{flex:1,minWidth:0}}><Row {...rest} last/></div>
+    {onEdit&&<button type="button" onClick={()=>{vibrate('light');onEdit()}} aria-label={editLabel||'Редагувати запис'} style={{flexShrink:0,width:34,height:34,borderRadius:10,border:'none',background:'rgba(23,23,23,0.05)',color:C.accent,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><Ico n="edit" s={16}/></button>}
+  </div>
+// ── Закриття місяця ────────────────────────────────────────
+// Контекст для вибраного місяця: enabled — чи підключена база «Закриті місяці», locked — чи місяць закритий
+const LockCtx = createContext({ enabled:false, locked:false, info:null, year:0, month:0, closeNow:null, reopenNow:null })
+const fmtWhen = at => { try { return new Date(at).toLocaleString('uk-UA',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) } catch(e){ return '' } }
+
+// Кнопка/плашка закриття. compact — на головній показуємо лише коли місяць закрито
+function ClosePanel({compact,loading}) {
+  const lock = useContext(LockCtx)
+  const [ask,     setAsk]     = useState(false)
+  const [working, setWorking] = useState(false)
+  const [err,     setErr]     = useState(null)
+  if (!lock.enabled || (compact && !lock.locked)) return null
+  const name = MONTHS_UA[lock.month]
+  const run = async fn => {
+    try { setWorking(true); setErr(null); await fn(); setAsk(false) }
+    catch(e){ vibrate('error'); setErr(e.message) } finally { setWorking(false) }
+  }
+  const who = lock.info?.by === 'авто' ? 'Закрито автоматично' : `Закрив: ${lock.info?.by||'власник'}`
+  const btn = (primary, danger) => ({flex:1,border:'none',borderRadius:14,padding:'12px 10px',fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',
+    background:primary?(danger?C.red:C.ink):'rgba(23,23,23,0.06)',color:primary?(danger?'#fff':C.yellow):C.dim,opacity:working?.6:1})
+  return <div role="group" aria-label={lock.locked?'Місяць закрито':'Закриття місяця'} style={{background:lock.locked?'rgba(255,214,10,.28)':C.surface,border:lock.locked?'none':`1px solid ${C.border}`,borderRadius:22,padding:'14px 16px',display:'flex',flexDirection:'column',gap:10}}>
+    <div style={{display:'flex',alignItems:'center',gap:10}}>
+      <div style={{width:36,height:36,borderRadius:12,background:lock.locked?C.ink:'rgba(23,23,23,0.06)',color:lock.locked?C.yellow:C.ink,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}><Ico n="lock" s={19}/></div>
+      <div style={{minWidth:0}}>
+        <div style={{fontSize:15,fontWeight:800,color:C.ink}}>{lock.locked?`${name} закрито`:`Закрити ${name.toLowerCase()}`}</div>
+        <div style={{fontSize:12,color:C.dim,lineHeight:1.4,marginTop:1}}>
+          {lock.locked
+            ? <>{who}{lock.info?.at?` · ${fmtWhen(lock.info.at)}`:''}. Підсумки зафіксовані, записи за цей місяць заблоковано.</>
+            : <>Зафіксує підсумки й заблокує зміни за місяць. Сам закривається після 22:00 останнього дня, коли власник відкриє додаток.</>}
+        </div>
+      </div>
+    </div>
+    {err&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>{err}</div>}
+    {!ask
+      ? <button type="button" disabled={loading||working} onClick={()=>{vibrate('light');setAsk(true)}} style={{...btn(!lock.locked),flex:'none',width:'100%'}}>{lock.locked?'Відкрити знову':'Закрити місяць'}</button>
+      : <>
+          <div style={{fontSize:12.5,color:C.ink,lineHeight:1.45}}>
+            {lock.locked
+              ? 'Замок знімається: підсумки знову рахуватимуться наживо, записи можна буде додавати, змінювати й видаляти.'
+              : 'Підсумки місяця буде зафіксовано, додавати й змінювати записи за нього не можна. Відкрити знову можна будь-коли.'}
+          </div>
+          <div style={{display:'flex',gap:8}}>
+            <button type="button" disabled={working} onClick={()=>setAsk(false)} style={btn(false)}>Скасувати</button>
+            <button type="button" disabled={working} onClick={()=>run(lock.locked?lock.reopenNow:lock.closeNow)} style={btn(true,!lock.locked)}>
+              {working?'Зачекай...':lock.locked?'Так, відкрити':'Так, закрити'}
+            </button>
+          </div>
+        </>}
+  </div>
+}
+
 const Prog = ({val,max,color}) =>
   <div style={{height:5,borderRadius:3,background:`${color}22`,overflow:'hidden'}}>
     <div style={{height:'100%',width:`${Math.min(100,(val/Math.max(max,1))*100)}%`,background:color,borderRadius:3,transition:'width .4s'}}/>
@@ -528,10 +585,10 @@ function EditDayForm({day,worker,onClose,onSaved,tgId,tgName,cfg}) {
       const ratePack = worker.ratePack||0
       // якщо кілька записів за день — видаляємо всі і створюємо один новий
       if (day.ids.length > 1) {
-        for (const id of day.ids) await archivePage?.(id) || deleteShift([id])
+        await deleteShift(day.ids, day.date)
         await saveShift({ tgId:worker.tgId, name:worker.name, rateHour, ratePack, date:day.date, hours:h, packs:pk, lunchBreak:0 })
       } else {
-        await updateShift(day.ids[0], { hours:h, packs:pk, rateHour, ratePack, lunchBreak:0 })
+        await updateShift(day.ids[0], { hours:h, packs:pk, rateHour, ratePack, lunchBreak:0, date:day.date })
       }
       await writeLog({tgId,name:tgName,action:`Редагування: ${worker.name}`,details:`${day.date}: ${h}год ${pk}пач`})
       vibrate('success')
@@ -545,7 +602,7 @@ function EditDayForm({day,worker,onClose,onSaved,tgId,tgName,cfg}) {
     if (!day.ids?.length) return
     try {
       setLoading(true)
-      await deleteShift(day.ids)
+      await deleteShift(day.ids, day.date)
       await writeLog({tgId,name:tgName,action:`Видалення дня: ${worker.name}`,details:day.date})
       vibrate('success')
       setSuccess(true)
@@ -788,15 +845,19 @@ function AdvanceForm({worker,allWorkers,isOwner,onClose,onSaved,tgId,tgName}) {
 // ================================================================
 // ФОРМА ШТРАФУ
 // ================================================================
-function FineForm({worker,allWorkers,onClose,onSaved,tgId,tgName}) {
-  const [selId,   setSelId]   = useState(worker?.tgId)
-  const [date,    setDate]    = useState(todayStr())
-  const [amount,  setAmount]  = useState(0)
-  const [reason,  setReason]  = useState('')
+// editRow — існуючий штраф {id,tgId,name,date,amount,reason}: форма стає «Корекція штрафу» з кнопкою видалення
+function FineForm({worker,allWorkers,editRow,onClose,onSaved,tgId,tgName}) {
+  const isEdit = !!editRow
+  const [selId,   setSelId]   = useState(editRow?.tgId ?? worker?.tgId)
+  const [date,    setDate]    = useState(editRow?.date?.slice(0,10) || todayStr())
+  const [amount,  setAmount]  = useState(editRow?.amount || 0)
+  const [reason,  setReason]  = useState(editRow?.reason || '')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error,   setError]   = useState(null)
-  const sel = allWorkers.find(w=>w.tgId===Number(selId))||worker
+  const [confirmDel, setConfirmDel] = useState(false)
+  const sel = allWorkers.find(w=>w.tgId===Number(selId)) || worker || {}
+  const personName = isEdit ? (editRow.name || sel.name || '') : sel.name
   const addAmount = (a) => { vibrate('light'); setAmount(prev => (Number(prev)||0) + a) }
 
   async function submit(e) {
@@ -804,20 +865,39 @@ function FineForm({worker,allWorkers,onClose,onSaved,tgId,tgName}) {
     if (!amount) return
     try {
       setLoading(true); setError(null)
-      await saveFine({tgId:sel.tgId,name:sel.name,date,amount:Number(amount),reason})
-      await writeLog({tgId,name:tgName,action:`Штраф: ${sel.name}`,details:`${fmt(amount)} ₴ · ${reason}`})
+      if (isEdit) {
+        await updateFine(editRow.id, {date,amount:Number(amount),reason,oldDate:editRow.date})
+        await writeLog({tgId,name:tgName,action:`Штраф (корекція): ${personName}`,details:`було ${fmt(editRow.amount)} ₴ · ${editRow.reason||''} → ${fmt(amount)} ₴ · ${reason}`})
+      } else {
+        await saveFine({tgId:sel.tgId,name:sel.name,date,amount:Number(amount),reason})
+        await writeLog({tgId,name:tgName,action:`Штраф: ${sel.name}`,details:`${fmt(amount)} ₴ · ${reason}`})
+      }
       vibrate('success')
       setSuccess(true)
-      setTimeout(()=>{onSaved();onClose()},1400)
+      setTimeout(()=>{onSaved();onClose()},isEdit?1100:1400)
     } catch(e){vibrate('error');setError(e.message)} finally{setLoading(false)}
   }
 
-  return <Sheet onClose={onClose} title="Штраф">
+  async function handleDelete() {
+    if (!confirmDel) { vibrate('warning'); setConfirmDel(true); return }
+    try {
+      setLoading(true); setError(null)
+      await deleteFine(editRow.id, editRow.date)
+      await writeLog({tgId,name:tgName,action:`Штраф видалено: ${personName}`,details:`${fmt(editRow.amount)} ₴ · ${editRow.reason||''} · ${editRow.date?.slice(0,10)}`})
+      vibrate('success')
+      setSuccess(true)
+      setTimeout(()=>{onSaved();onClose()},900)
+    } catch(e){vibrate('error');setError(e.message);setConfirmDel(false)} finally{setLoading(false)}
+  }
+
+  return <Sheet onClose={onClose} title={isEdit?'Корекція штрафу':'Штраф'}>
     <form onSubmit={submit} style={{display:'flex',flexDirection:'column',gap:14}}>
-      <div><Lbl>РОБІТНИК</Lbl>
-        <select value={selId} onChange={e=>setSelId(e.target.value)} style={{...inp,cursor:'pointer'}}>
-          {allWorkers.map(w=><option key={w.tgId} value={w.tgId}>{w.name}</option>)}
-        </select></div>
+      {isEdit
+        ? <div><Lbl>РОБІТНИК</Lbl><div style={{...inp,background:'rgba(23,23,23,0.02)',color:C.dim}}>{personName}</div></div>
+        : <div><Lbl>РОБІТНИК</Lbl>
+            <select value={selId} onChange={e=>setSelId(e.target.value)} style={{...inp,cursor:'pointer'}}>
+              {allWorkers.map(w=><option key={w.tgId} value={w.tgId}>{w.name}</option>)}
+            </select></div>}
       <div><Lbl>ДАТА</Lbl><input type="date" value={date} max={todayStr()} onChange={e=>setDate(e.target.value)} style={inp}/></div>
       <div>
         <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
@@ -830,14 +910,21 @@ function FineForm({worker,allWorkers,onClose,onSaved,tgId,tgName}) {
         <input type="number" inputMode="numeric" value={amount||''} onChange={e=>setAmount(e.target.value)} placeholder="або введи вручну" style={inp}/>
       </div>
       {amount>0&&<div style={{background:`${C.red}11`,border:'none',borderRadius:14,padding:'12px 16px',display:'flex',justifyContent:'space-between'}}>
-        <span style={{fontSize:12,color:C.dim}}>{sel?.name}</span>
+        <span style={{fontSize:12,color:C.dim}}>{personName}</span>
         <span style={{fontSize:18,fontWeight:700,color:C.red}}>-{fmt(Number(amount))} ₴</span>
       </div>}
       <div><Lbl>ПРИЧИНА</Lbl><input type="text" value={reason} onChange={e=>setReason(e.target.value)} placeholder="Запізнення / прогул / брак" style={inp}/></div>
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>{error}</div>}
       <button type="submit" disabled={loading||success||!amount} style={{background:success?C.ink:C.red,color:success?C.yellow:'#fff',border:'none',borderRadius:16,padding:16,fontSize:15,fontWeight:800,cursor:'pointer',fontFamily:'inherit',opacity:!amount?.5:1}}>
-        {loading?'Збереження...':success?<Done/>:'Оштрафувати'}
+        {loading?'Збереження...':success?<Done/>:isEdit?'Зберегти зміни':'Оштрафувати'}
       </button>
+      {isEdit&&<>
+        <button type="button" onClick={handleDelete} disabled={loading||success}
+          style={{background:confirmDel?C.red:'transparent',border:`1px solid ${confirmDel?C.red:C.red+'55'}`,color:confirmDel?'#fff':C.red,borderRadius:14,padding:13,fontSize:14,fontWeight:700,cursor:'pointer',fontFamily:'inherit',transition:'all .2s'}}>
+          {confirmDel?'Підтвердити видалення':'Видалити штраф'}
+        </button>
+        {confirmDel&&<div style={{fontSize:12,color:C.muted,textAlign:'center'}}>Натисни ще раз, щоб видалити штраф {fmt(editRow.amount)} ₴ остаточно</div>}
+      </>}
     </form>
   </Sheet>
 }
@@ -999,8 +1086,31 @@ function Toggle({on,onClick,label}) {
   </div>
 }
 
+// Галочка «Тільки цей місяць»: зміна діє лише в поточному місяці, далі знову діють попередні значення
+function OnlyThisMonth({on,onChange}) {
+  const name = MONTHS_UA[new Date().getMonth()]
+  return <label style={{display:'flex',alignItems:'flex-start',gap:12,padding:'12px 14px',borderRadius:14,cursor:'pointer',background:on?'rgba(255,214,10,.28)':'rgba(23,23,23,0.04)',transition:'background .2s'}}>
+    <input type="checkbox" checked={on} onChange={e=>{vibrate('light');onChange(e.target.checked)}} style={{width:22,height:22,flexShrink:0,marginTop:1,accentColor:C.ink,cursor:'pointer'}}/>
+    <span style={{display:'block'}}>
+      <span style={{display:'block',fontSize:14,fontWeight:700,color:C.text}}>Тільки цей місяць</span>
+      <span style={{display:'block',fontSize:12,color:C.muted,marginTop:2,lineHeight:1.4}}>
+        {on ? `Діє лише в поточному місяці (${name}). Від наступного знову діятимуть попередні значення.` : `Без галочки зміна діє від поточного місяця (${name}) і далі.`}
+      </span>
+    </span>
+  </label>
+}
+
+// Що саме зараз діє «тільки на цей місяць» (щоб власник бачив, чому число відрізняється від звичайного)
+function TempNote({params}) {
+  if (!params?.length) return null
+  return <div style={{background:'rgba(23,23,23,0.04)',borderRadius:14,padding:'10px 12px',fontSize:12,color:C.dim,lineHeight:1.45}}>
+    <b>Тільки на цей місяць:</b> {[...new Set(params.map(paramLabel))].join(', ')}. Від наступного місяця діятимуть попередні значення. Щоб зробити постійним — введи значення без галочки.
+  </div>
+}
+
 function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
   const isFixed = worker.type==='fixed'
+  const [once, setOnce] = useState(false)
   const [val,        setVal]        = useState(isFixed?(worker.gross||''):(worker.rateHour||''))
   const [valPack,    setValPack]    = useState(worker.ratePack||'')
   const [bonusOff,   setBonusOff]   = useState(worker.bonusOff||false)
@@ -1036,7 +1146,7 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
         // Історія: зміни діють з поточного (справжнього) місяця й далі, минулі місяці не чіпаємо
         const nz = v => (v===''||v===null||v===undefined) ? null : Number(v)
         const changes = []
-        const add = (param, nv, ov) => { if (nv!==ov) changes.push({param, value:nv, old:ov}) }
+        const add = (param, nv, ov) => { if (nv!==ov) changes.push({param, value:nv}) }
         if (isFixed) add('salary', nz(val), nz(worker.gross))
         else {
           add('rateHour', nz(val), nz(worker.rateHourBase ?? worker.rateHour))
@@ -1051,7 +1161,7 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
           }
           Object.keys(ind).forEach(k => add('ind.'+k, nz(ind[k]), nz((worker.ind||{})[k])))
         }
-        await saveSettingChanges(new Date().getFullYear(), new Date().getMonth(), worker.tgId, changes)
+        await saveSettingChanges(new Date().getFullYear(), new Date().getMonth(), worker.tgId, changes, once)
         if (!isFixed && fuelAccess !== !!worker.fuelAccess) await updateStaffToggles(worker.staffPageId, {fuelAccess})
       } else if (isFixed) await updateFixedSalary(worker.staffPageId, val)
       else {
@@ -1061,7 +1171,7 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
           rateHourLow:lowRateOn?(rateHourLow!==''?rateHourLow:null):undefined,
           ratePackLow:lowRateOn?(ratePackLow!==''?ratePackLow:null):undefined})
       }
-      await writeLog({tgId,name:tgName,action:`Ставки: ${worker.name}`,details:isFixed?`Фікс: ${val}`:`Год: ${val}, Пач: ${valPack}, Бонуси:${bonusOff?'OFF':'ON'}, Премії:${premiumOff?'OFF':'ON'}`})
+      await writeLog({tgId,name:tgName,action:`Ставки: ${worker.name}`,details:(isFixed?`Фікс: ${val}`:`Год: ${val}, Пач: ${valPack}, Бонуси:${bonusOff?'OFF':'ON'}, Премії:${premiumOff?'OFF':'ON'}`)+(once&&historyEnabled()?' · тільки цей місяць':'')})
       vibrate('success')
       setSuccess(true)
       setTimeout(()=>{onSaved();onClose()},1200)
@@ -1086,6 +1196,7 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
       {viewingPast&&<div style={{background:'rgba(255,214,10,.28)',borderRadius:14,padding:'10px 12px',fontSize:12.5,fontWeight:600,color:C.ink,lineHeight:1.4}}>
         Зміни діятимуть від поточного місяця ({MONTHS_UA[nowD.getMonth()]}) і далі. {MONTHS_UA[month]} та раніші місяці лишаються як були.
       </div>}
+      {!viewingPast&&<TempNote params={worker.tempParams}/>}
       {isFixed
         ? <div><Lbl>ФІКСОВАНА ЗАРПЛАТА (грн/міс)</Lbl><input type="number" value={val} onChange={e=>setVal(e.target.value)} placeholder={`Зараз: ${worker.gross||'—'}`} style={inp}/></div>
         : <>
@@ -1131,6 +1242,7 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
             </div>}
           </div>
         </>}
+      {historyEnabled()&&<OnlyThisMonth on={once} onChange={setOnce}/>}
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>{error}</div>}
       <button type="submit" disabled={loading||success} style={{background:success?C.ink:C.yellow,color:success?C.yellow:C.ink,border:'none',borderRadius:16,padding:16,fontSize:15,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>
         {loading?'Збереження...':success?<Done/>:'Зберегти'}
@@ -1185,7 +1297,7 @@ function EditWorkerForm({worker,onClose,onSaved,tgId,tgName}) {
     try {
       setLoading(true); setError(null)
       const res = await deleteWorkerCompletely(worker.tgId, worker.staffPageId)
-      await writeLog({tgId,name:tgName,action:`Повне видалення: ${worker.name}`,details:`Записів видалено: ${res.deletedRecords}`})
+      await writeLog({tgId,name:tgName,action:`Повне видалення: ${worker.name}`,details:`Записів видалено: ${res.deletedRecords}`+(res.keptInClosed?`, у закритих місяцях лишилось: ${res.keptInClosed}`:'')})
       vibrate('medium')
       onSaved(); onClose()
     } catch(e){vibrate('error');setError(e.message)} finally{setLoading(false)}
@@ -1216,7 +1328,7 @@ function EditWorkerForm({worker,onClose,onSaved,tgId,tgName}) {
           style={{background:confirm==='everything'?C.red:'transparent',color:confirm==='everything'?'#fff':C.red,border:`1px solid ${C.red}`,borderRadius:10,padding:12,fontSize:13,cursor:'pointer',fontFamily:'inherit',fontWeight:700,marginTop:4}}>
           {confirm==='everything'?'Підтвердити — видалити ВСЕ назавжди':'Видалити повністю (зі змінами)'}
         </button>
-        <div style={{fontSize:12,color:C.muted,marginTop:-4}}>Видалить картку «Персонал» + усі його зміни, аванси, премії, борги за весь час. Інших працівників не торкає. Незворотно.</div>
+        <div style={{fontSize:12,color:C.muted,marginTop:-4}}>Видалить картку «Персонал» + усі його зміни, аванси, премії, борги за весь час. Інших працівників не торкає. Незворотно.{closingEnabled()?' Записи закритих місяців не видаляються — архів лишається цілим.':''}</div>
       </div>
     </form>
   </Sheet>
@@ -1285,10 +1397,13 @@ function AddWorkerForm({onClose,onSaved,tgId,tgName}) {
 // ================================================================
 function SettingsForm({cfg,onClose,onSaved,tgId,tgName,year,month}) {
   const [form,    setForm]    = useState({...cfg})
+  const [once,    setOnce]    = useState(false)
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error,   setError]   = useState(null)
   const set = (k,v) => setForm(f=>({...f,[k]:Number(v)}))
+  const nowD = new Date()
+  const viewingPast = historyEnabled() && month!=null && (year!==nowD.getFullYear() || month!==nowD.getMonth())
 
   async function submit(e) {
     e.preventDefault()
@@ -1296,11 +1411,12 @@ function SettingsForm({cfg,onClose,onSaved,tgId,tgName,year,month}) {
       setLoading(true); setError(null)
       if (historyEnabled()) {
         const keys = ['minDaysForBonus','bonusPerLongDay','bonusSaturday','premiumDays','premiumAmount','longDayHours','longDaysNeeded']
-        const changes = keys.filter(k=>Number(form[k])!==Number(cfg[k])).map(k=>({param:'cfg.'+k,value:Number(form[k]),old:Number(cfg[k])}))
-        await saveSettingChanges(new Date().getFullYear(), new Date().getMonth(), null, changes)
+        const changes = keys.filter(k=>Number(form[k])!==Number(cfg[k])).map(k=>({param:'cfg.'+k,value:Number(form[k])}))
+        await saveSettingChanges(new Date().getFullYear(), new Date().getMonth(), null, changes, once)
         await saveSettings(cfg.pageId, form, ['lunchBreak','electricityTariff'])
       } else await saveSettings(cfg.pageId, form)
-      await writeLog({tgId,name:tgName,action:'Налаштування',details:JSON.stringify(form)})
+      const { tempParams:_t, pageId:_p, ...plain } = form
+      await writeLog({tgId,name:tgName,action:'Налаштування',details:JSON.stringify(plain)+(once&&historyEnabled()?' · тільки цей місяць':'')})
       vibrate('success')
       setSuccess(true)
       setTimeout(()=>{onSaved();onClose()},1200)
@@ -1321,7 +1437,12 @@ function SettingsForm({cfg,onClose,onSaved,tgId,tgName,year,month}) {
 
   return <Sheet onClose={onClose} title="Налаштування">
     <form onSubmit={submit} style={{display:'flex',flexDirection:'column',gap:12}}>
+      {viewingPast&&<div style={{background:'rgba(255,214,10,.28)',borderRadius:14,padding:'10px 12px',fontSize:12.5,fontWeight:600,color:C.ink,lineHeight:1.4}}>
+        Зміни діятимуть від поточного місяця ({MONTHS_UA[nowD.getMonth()]}) і далі. {MONTHS_UA[month]} та раніші місяці лишаються як були.
+      </div>}
+      {!viewingPast&&<TempNote params={cfg.tempParams}/>}
       {fields.map(f=><div key={f.k}><Lbl>{f.l}</Lbl><input type="number" step="0.5" value={form[f.k]??''} onChange={e=>set(f.k,e.target.value)} style={inp}/></div>)}
+      {historyEnabled()&&<OnlyThisMonth on={once} onChange={setOnce}/>}
       {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>{error}</div>}
       <button type="submit" disabled={loading||success} style={{background:success?C.ink:C.yellow,color:success?C.yellow:C.ink,border:'none',borderRadius:16,padding:16,fontSize:15,fontWeight:800,cursor:'pointer',fontFamily:'inherit',marginTop:4}}>
         {loading?'Збереження...':success?<Done/>:'Зберегти'}
@@ -1335,6 +1456,7 @@ function SettingsForm({cfg,onClose,onSaved,tgId,tgName,year,month}) {
 // ================================================================
 function FinesView({workers,onBack,onRefresh,tgId,tgName,month,year}) {
   const [modal,setModal]=useState(false)
+  const [editFine,setEditFine]=useState(null)
   const fined = workers.filter(w=>(w.totalFines||0)>0)
   const total = fined.reduce((s,w)=>s+w.totalFines,0)
   return <div className="view-in" style={{minHeight:'100vh',background:C.bg,paddingBottom:40}}>
@@ -1350,13 +1472,17 @@ function FinesView({workers,onBack,onRefresh,tgId,tgName,month,year}) {
         <div style={{display:'flex',justifyContent:'space-between',fontWeight:700,fontSize:14,marginBottom:6}}>
           <span>{w.name}</span><span style={{color:C.red}}>−{fmt(w.totalFines)} ₴</span>
         </div>
-        {(w.fines||[]).map((f,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:12,color:C.dim,padding:'3px 0'}}>
-          <span>{f.date?.slice(5).split('-').reverse().join('.')} · {f.reason||'без причини'}</span><span>{fmt(f.amount)} ₴</span>
+        {(w.fines||[]).map((f,i)=><div key={f.id||i} style={{display:'flex',alignItems:'center',gap:8,fontSize:12,color:C.dim,padding:'3px 0'}}>
+          <div style={{flex:1,minWidth:0,display:'flex',justifyContent:'space-between',gap:10}}>
+            <span>{f.date?.slice(5,10).split('-').reverse().join('.')} · {f.reason||'без причини'}</span><span style={{whiteSpace:'nowrap'}}>{fmt(f.amount)} ₴</span>
+          </div>
+          {f.id&&<button type="button" onClick={()=>{vibrate('light');setEditFine(f)}} aria-label="Редагувати штраф" style={{flexShrink:0,width:32,height:32,borderRadius:10,border:'none',background:'rgba(23,23,23,0.05)',color:C.accent,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}><Ico n="edit" s={15}/></button>}
         </div>)}
       </div>)}
       <button onClick={()=>setModal(true)} style={{background:C.red,color:'#fff',border:'none',borderRadius:16,padding:14,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Оштрафувати</button>
     </div>
     {modal&&<FineForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(false)} onSaved={()=>{onRefresh()}} tgId={tgId} tgName={tgName}/>}
+    {editFine&&<FineForm editRow={editFine} worker={workers.find(x=>x.tgId===editFine.tgId)||{}} allWorkers={workers} onClose={()=>setEditFine(null)} onSaved={()=>{onRefresh()}} tgId={tgId} tgName={tgName}/>}
   </div>
 }
 
@@ -2312,16 +2438,18 @@ function MonthlyStats({tgId,name,onBack}) {
 function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,month,year,onMonthChange,loading}) {
   const [modal,    setModal]    = useState(null)
   const [editDay,  setEditDay]  = useState(null)
+  const [editFine, setEditFine] = useState(null)
   const [showStats,setShowStats]= useState(false)
   const [payslip,  setPayslip]  = useState(false)
   const [motiv]                 = useState(randomMotiv())
+  const locked = useContext(LockCtx).locked
 
   if (showStats) return <MonthlyStats tgId={w.tgId} name={w.name} onBack={()=>setShowStats(false)}/>
 
 
   return <div className="view-in" style={{minHeight:'100vh',background:C.bg,paddingBottom:40}}>
     <Header title={w.name} sub={w.type==='fixed'?(w.role||'Фіксована'):'Погодинний + пачки'} onBack={onBack}
-      right={isOwner&&<div style={{display:'flex',gap:6}}>
+      right={isOwner&&!w.ghost&&<div style={{display:'flex',gap:6}}>
         <IconBtn onClick={()=>setModal('edit')} label="Редагувати"><Ico n="user" s={20}/></IconBtn>
         <button onClick={()=>{vibrate('light');setModal('rates')}} style={{background:C.yellow,border:'none',color:C.ink,borderRadius:20,padding:'0 16px',height:40,fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit'}}>Ставки</button>
       </div>}/>
@@ -2331,6 +2459,10 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
 
       {loading ? <Skel h={168} r={28}/> : <>
       <PayHero w={w} month={month}/>
+
+      {locked&&<div style={{display:'flex',alignItems:'center',gap:10,background:'rgba(255,214,10,.28)',borderRadius:16,padding:'10px 14px',fontSize:12.5,fontWeight:600,color:C.ink,lineHeight:1.4}}>
+        <Ico n="lock" s={18}/><span>Місяць закрито: підсумки зафіксовані, записи за нього змінювати не можна.</span>
+      </div>}
 
       {w.daysSinceEntry>=2&&w.type==='shift'&&year===new Date().getFullYear()&&month===new Date().getMonth()&&<div style={{background:`${C.red}11`,border:`1px solid ${C.red}33`,borderRadius:10,padding:'10px 14px',fontSize:12,color:C.red}}>
         Не вносив дані {w.daysSinceEntry} {plural(w.daysSinceEntry,'день','дні','днів')}
@@ -2352,12 +2484,12 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
 
       {/* Кнопки */}
       <div className="stagger" style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
-        {w.type==='shift'&&<Tile i={0} n="clock" label="Зміна" primary onClick={()=>setModal('shift')}/>}
-        {isOwner&&<Tile i={1} n="star" label="Премія" onClick={()=>setModal('bonus')}/>}
-        {isOwner&&<Tile i={2} n="ban" label="Штраф" danger onClick={()=>setModal('fine')}/>}
-        <Tile i={3} n="card" label="Аванс" onClick={()=>setModal('advance')}/>
-        {isOwner&&<Tile i={4} n="wallet" label="Борг" onClick={()=>setModal('debt')}/>}
-        {w.debtRemaining>0&&<Tile i={5} n="check" label="Виплата боргу" onClick={()=>setModal('debtpay')}/>}
+        {!locked&&w.type==='shift'&&<Tile i={0} n="clock" label="Зміна" primary onClick={()=>setModal('shift')}/>}
+        {!locked&&isOwner&&<Tile i={1} n="star" label="Премія" onClick={()=>setModal('bonus')}/>}
+        {!locked&&isOwner&&<Tile i={2} n="ban" label="Штраф" danger onClick={()=>setModal('fine')}/>}
+        {!locked&&<Tile i={3} n="card" label="Аванс" onClick={()=>setModal('advance')}/>}
+        {!locked&&isOwner&&<Tile i={4} n="wallet" label="Борг" onClick={()=>setModal('debt')}/>}
+        {!locked&&w.debtRemaining>0&&<Tile i={5} n="check" label="Виплата боргу" onClick={()=>setModal('debtpay')}/>}
         <Tile i={6} n="chart" label="Статистика" onClick={()=>setShowStats(true)}/>
         <Tile i={7} n="doc" label="Листок" onClick={()=>setPayslip(true)}/>
       </div>
@@ -2402,7 +2534,7 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
 
       {w.type==='shift'&&w.days?.length>0&&<Card>
         <SecTitle>ДЕТАЛІ ПО ДНЯХ</SecTitle>
-        <DaysExpand days={w.days} rateHour={w.rateHour} ratePack={w.ratePack} longDayHours={w.eLongHours||cfg?.longDayHours} isOwner={isOwner} onEdit={isOwner?setEditDay:null}/>
+        <DaysExpand days={w.days} rateHour={w.rateHour} ratePack={w.ratePack} longDayHours={w.eLongHours||cfg?.longDayHours} isOwner={isOwner} onEdit={isOwner&&!locked?setEditDay:null}/>
       </Card>}
 
       {w.advances?.length>0&&<Card>
@@ -2412,7 +2544,8 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
 
       {w.fines?.length>0&&<Card>
         <SecTitle>ШТРАФИ</SecTitle>
-        {w.fines.map((f,i)=><Row key={i} label={f.date} value={`-${fmt(f.amount)} ₴`} color={C.red} sub={f.reason} last={i===w.fines.length-1}/>)}
+        {w.fines.map((f,i)=><EditRow key={f.id||i} label={f.date?.slice(0,10)} value={`-${fmt(f.amount)} ₴`} color={C.red} sub={f.reason} last={i===w.fines.length-1}
+          onEdit={isOwner&&!locked&&f.id?()=>setEditFine(f):null} editLabel="Редагувати штраф"/>)}
       </Card>}
 
       {w.bonuses?.length>0&&<Card>
@@ -2431,6 +2564,7 @@ function WorkerDetail({w,allWorkers,onBack,onRefresh,tgId,tgName,cfg,isOwner,mon
     {modal==='rates'  &&<RatesForm year={year} month={month} worker={w} onClose={()=>setModal(null)} onSaved={()=>{onRefresh();setModal(null)}} tgId={tgId} tgName={tgName} cfg={cfg}/>}
     {modal==='edit'   &&<EditWorkerForm worker={w} onClose={()=>setModal(null)} onSaved={()=>{onBack();onRefresh()}} tgId={tgId} tgName={tgName}/>}
     {editDay&&<EditDayForm day={editDay} worker={w} onClose={()=>setEditDay(null)} onSaved={()=>{onRefresh();setEditDay(null)}} tgId={tgId} tgName={tgName} cfg={cfg}/>}
+    {editFine&&<FineForm editRow={editFine} worker={w} allWorkers={allWorkers} onClose={()=>setEditFine(null)} onSaved={()=>{onRefresh();setEditFine(null)}} tgId={tgId} tgName={tgName}/>}
     {payslip&&<PayslipModal w={w} month={month} year={year} onClose={()=>setPayslip(false)}/>}
   </div>
 }
@@ -2627,6 +2761,8 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
             </div>}
       </div>
 
+      {!loading&&<ClosePanel compact/>}
+
       <div className="stagger" style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
         <Tile i={0} n="clock" label="Зміна" primary onClick={()=>setModal('shift')}/>
         <Tile i={1} n="star" label="Премія" onClick={()=>setModal('bonus')}/>
@@ -2643,6 +2779,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
       </>}
 
       {tab==='reports'&&<>
+      {!loading&&<ClosePanel/>}
       <div className="stagger" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
         <Card style={{'--i':0}}><Lbl>Нараховано</Lbl><div style={{fontSize:21,fontWeight:800}}><Num value={totalGross}/></div></Card>
         <Card style={{'--i':1}}><Lbl>До виплати</Lbl><div style={{fontSize:21,fontWeight:800}}><Num value={totalFOP}/></div></Card>
@@ -2695,6 +2832,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
 function WorkerView({tgId,data,onRefresh,loading,busy}) {
   const w = calcSalary(tgId, data)
   const cfg = data.cfg
+  const locked = useContext(LockCtx).locked
   const [modal,         setModal]         = useState(null)
   const [year,          setYear]          = useState(new Date().getFullYear())
   const [month,         setMonth]         = useState(new Date().getMonth())
@@ -2728,6 +2866,10 @@ function WorkerView({tgId,data,onRefresh,loading,busy}) {
 
       <PayHero w={w} month={month}/>
 
+      {locked&&<div style={{display:'flex',alignItems:'center',gap:10,background:'rgba(255,214,10,.28)',borderRadius:16,padding:'10px 14px',fontSize:12.5,fontWeight:600,color:C.ink,lineHeight:1.4}}>
+        <Ico n="lock" s={18}/><span>Місяць закрито: підсумки зафіксовані, записи за нього змінювати не можна.</span>
+      </div>}
+
       {w.fines?.length>0&&<div style={{background:`${C.red}11`,border:`2px solid ${C.red}`,borderRadius:20,padding:'14px 16px'}}>
         <div style={{fontSize:13,fontWeight:800,color:C.red,marginBottom:8}}>Штраф</div>
         {w.fines.map((f,i)=><div key={i} style={{display:'flex',justifyContent:'space-between',gap:10,fontSize:13,padding:'4px 0'}}>
@@ -2758,8 +2900,8 @@ function WorkerView({tgId,data,onRefresh,loading,busy}) {
       </Card>
 
       <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
-        <Tile i={0} n="clock" label="Зміна" primary onClick={()=>setModal('shift')}/>
-        <Tile i={1} n="card" label="Аванс" onClick={()=>setModal('advance')}/>
+        {!locked&&<Tile i={0} n="clock" label="Зміна" primary onClick={()=>setModal('shift')}/>}
+        {!locked&&<Tile i={1} n="card" label="Аванс" onClick={()=>setModal('advance')}/>}
         <Tile i={2} n="chart" label="Звіт" onClick={()=>setShowStats(true)}/>
         <Tile n="doc" label="Листок" onClick={()=>setShowPayslip(true)}/>
         {w.fuelAccess&&<Tile n="fuel" label="Внести паливо" wide onClick={()=>setView('fuel')}/>}
@@ -2799,7 +2941,7 @@ function WorkerView({tgId,data,onRefresh,loading,busy}) {
 
       {w.days?.length>0&&<Card>
         <SecTitle>МОЇ ДНІ</SecTitle>
-        <DaysExpand days={w.days} rateHour={w.rateHour} ratePack={w.ratePack} longDayHours={w.eLongHours||cfg?.longDayHours} isOwner={true} onEdit={setWorkerEditDay}/>
+        <DaysExpand days={w.days} rateHour={w.rateHour} ratePack={w.ratePack} longDayHours={w.eLongHours||cfg?.longDayHours} isOwner={true} onEdit={locked?null:setWorkerEditDay}/>
       </Card>}
     </div>
 
@@ -2875,6 +3017,8 @@ export default function App() {
     try {
       const [sh, md2] = await Promise.all([fetchShared(), fetchMonthData(cy,cm)])
       cache.current.set(monthKeyOf(cy,cm), { md:md2, at:Date.now() })
+      // після запису інші місяці могли змінитись (запис переїхав на іншу дату): покажемо з кешу, але оновимо при відкритті
+      cache.current.forEach((v,k)=>{ if (k!==monthKeyOf(cy,cm)) v.at = 0 })
       if (!alive.current) return
       setShared(sh)
       if (sel.current.y===cy && sel.current.m===cm) { setMd(md2); setLoadingMonth(false) }
@@ -2892,6 +3036,17 @@ export default function App() {
       try { const md2 = await fetchMonthData(yy,mm); cache.current.set(monthKeyOf(yy,mm), { md:md2, at:Date.now() }) } catch(e){}
     }
   },[])
+
+  // Автозакриття: власник відкрив додаток після 22:00 останнього дня місяця (або пізніше) — закриваємо місяць без таймера
+  const runAutoClose = useCallback(async (sh, uid, uname)=>{
+    try {
+      const r = await autoCloseMonth(sh, 'авто')
+      if (!r || !alive.current) return
+      await writeLog({tgId:uid, name:uname, action:`Місяць закрито автоматично: ${MONTHS_UA[r.month]} ${r.year}`, details:''})
+      await refresh()
+      showToast(`${MONTHS_UA[r.month]} закрито автоматично`)
+    } catch(e) { console.warn('Автозакриття:', e.message); showToast('Не вдалося закрити місяць автоматично') }
+  },[refresh, showToast])
 
   const load = useCallback(async ()=>{
     try {
@@ -2920,12 +3075,32 @@ export default function App() {
         setState(acc.allowed ? 'worker' : 'denied')
       }
       prefetch(yr, mo)
+      if (owner && closingEnabled()) runAutoClose(sh, uid, uname)
     } catch(e) { setError(e.message); setState('error') }
-  },[prefetch])
+  },[prefetch, runAutoClose])
 
   useEffect(()=>{ load() },[])
 
   const handleMonthChange = selectMonth
+
+  // Закрити / відкрити знову вибраний місяць (кнопки на екрані власника)
+  const closeNow = useCallback(async ()=>{
+    const { y, m } = sel.current
+    await closeMonth(shared, y, m, tgName || 'власник')
+    await writeLog({tgId, name:tgName, action:`Місяць закрито: ${MONTHS_UA[m]} ${y}`, details:''})
+    await refresh(y, m)
+    showToast(`${MONTHS_UA[m]} закрито`)
+  },[shared, tgId, tgName, refresh, showToast])
+  const reopenNow = useCallback(async ()=>{
+    const { y, m } = sel.current
+    await reopenMonth(y, m, tgName || 'власник')
+    await writeLog({tgId, name:tgName, action:`Місяць відкрито знову: ${MONTHS_UA[m]} ${y}`, details:''})
+    await refresh(y, m)
+    showToast(`${MONTHS_UA[m]} відкрито знову`)
+  },[tgId, tgName, refresh, showToast])
+  const lockValue = useMemo(()=>({
+    enabled:closingEnabled(), locked:!!data?.closed, info:data?.closed||null, year, month, closeNow, reopenNow,
+  }),[data, year, month, closeNow, reopenNow])
 
   if (state==='loading') return <AppSkeleton/>
 
@@ -2950,7 +3125,7 @@ export default function App() {
     </div>
   )
 
-  if (state==='owner')  return <><OwnerDashboard workers={workers} onRefresh={refresh} tgId={tgId} tgName={tgName} cfg={data?.cfg||DEFAULT_CFG} year={year} month={month} onMonthChange={handleMonthChange} loading={loadingMonth} busy={busy>0}/><Toast text={toast}/></>
-  if (state==='worker') return <><WorkerView tgId={tgId} data={data} onRefresh={refresh} loading={loadingMonth} busy={busy>0}/><Toast text={toast}/></>
+  if (state==='owner')  return <LockCtx.Provider value={lockValue}><OwnerDashboard workers={workers} onRefresh={refresh} tgId={tgId} tgName={tgName} cfg={data?.cfg||DEFAULT_CFG} year={year} month={month} onMonthChange={handleMonthChange} loading={loadingMonth} busy={busy>0}/><Toast text={toast}/></LockCtx.Provider>
+  if (state==='worker') return <LockCtx.Provider value={lockValue}><WorkerView tgId={tgId} data={data} onRefresh={refresh} loading={loadingMonth} busy={busy>0}/><Toast text={toast}/></LockCtx.Provider>
   return null
 }

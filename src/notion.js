@@ -20,6 +20,7 @@ const DB = {
   fuel:         import.meta.env.VITE_DB_FUEL,
   electricity:  import.meta.env.VITE_DB_ELECTRICITY,
   settingsLog:  import.meta.env.VITE_DB_SETTINGS_LOG,
+  monthClose:   import.meta.env.VITE_DB_MONTH_CLOSE,
 }
 
 async function nr(path, method = 'POST', body = null) {
@@ -145,21 +146,27 @@ async function fetchSettingsLog() {
     const r = await queryDB(DB.settingsLog)
     return r.results.map(x => {
       const q = x.properties
-      let value = null
+      let value = null, only = false
       try { value = JSON.parse(p.text(q['Значення'])) } catch {}
-      return { month:p.text(q['Місяць']), tgId:p.numN(q['ID']), param:p.text(q['Параметр']), value, created:x.created_time||'' }
+      // «Тільки цей місяць» зберігається як { "v": значення, "only": true } і діє лише у своєму місяці
+      if (value && typeof value==='object' && !Array.isArray(value) && 'v' in value) { only = !!value.only; value = value.v }
+      return { id:x.id, month:p.text(q['Місяць']), tgId:p.numN(q['ID']), param:p.text(q['Параметр']), value, only, created:x.created_time||'' }
     }).filter(e => e.month && e.param)
   } catch { return [] }
 }
 
+// У межах одного місяця разовий запис («тільки цей місяць») сильніший за постійний
+const entryRank = e => e.month + (e.only ? '~' : '')
+
 function pickEntries(log, key) {
-  // останній запис для кожної пари (ID, параметр) з місяцем <= key
+  // останній запис для кожної пари (ID, параметр) з місяцем <= key; разовий запис діє лише у своєму місяці
   const best = new Map()
   for (const e of log) {
     if (e.month > key) continue
+    if (e.only && e.month !== key) continue
     const k = `${e.tgId??'*'}|${e.param}`
     const cur = best.get(k)
-    if (!cur || e.month > cur.month || (e.month === cur.month && e.created > cur.created)) best.set(k, e)
+    if (!cur || entryRank(e) > entryRank(cur) || (entryRank(e) === entryRank(cur) && e.created > cur.created)) best.set(k, e)
   }
   return best
 }
@@ -168,60 +175,188 @@ export function applyHistory(data, key, log) {
   if (!log.length) return data
   const best = pickEntries(log, key)
   const get = (tgId, param) => best.get(`${tgId??'*'}|${param}`)
-  const cfg = { ...data.cfg }
-  HIST_CFG.forEach(k => { const e = get(null, 'cfg.'+k); if (e && e.value!==null) cfg[k] = e.value })
+  // tempParams — параметри, що цього місяця діють «тільки цей місяць» (щоб показати це у формах)
+  const cfg = { ...data.cfg, tempParams:[] }
+  HIST_CFG.forEach(k => { const e = get(null, 'cfg.'+k); if (e && e.value!==null) { cfg[k] = e.value; if (e.only) cfg.tempParams.push('cfg.'+k) } })
   const staff = data.staff.map(s => {
-    const o = { ...s, ind:{ ...s.ind } }
+    const o = { ...s, ind:{ ...s.ind }, tempParams:[] }
     ;['rateHour','ratePack','bonusOff','premiumOff','lowRateOn','lowRateDays','rateHourLow','ratePackLow'].forEach(k => {
-      const e = get(s.tgId, k); if (e) o[k] = e.value
+      const e = get(s.tgId, k); if (e) { o[k] = e.value; if (e.only) o.tempParams.push(k) }
     })
-    HIST_CFG.forEach(k => { const e = get(s.tgId, 'ind.'+k); if (e) o.ind[k] = e.value })
+    HIST_CFG.forEach(k => { const e = get(s.tgId, 'ind.'+k); if (e) { o.ind[k] = e.value; if (e.only) o.tempParams.push('ind.'+k) } })
     return o
   })
   const fixedStaff = data.fixedStaff.map(f => {
-    const e = get(f.tgId, 'salary'); return e ? { ...f, salary:e.value } : f
+    const e = get(f.tgId, 'salary'); return e ? { ...f, salary:e.value, tempParams:e.only ? ['salary'] : [] } : f
   })
   return { ...data, cfg, staff, fixedStaff }
 }
 
-// changes: [{ param, value }], tgId: null для загальних налаштувань
+// changes: [{ param, value }], tgId: null для загальних налаштувань.
+// onlyThisMonth: значення діє лише в цьому місяці, далі знову діють попередні (окремий запис з позначкою only).
 export async function saveSettingChanges(year, month, tgId, changes, onlyThisMonth = false) {
-  const key = monthKey(year, month)
-  if (onlyThisMonth && changes.length) {
-    // «Тільки цей місяць»: для наступного місяця фіксуємо старе значення, якщо там немає власної зміни
-    const nd = new Date(year, month+1)
-    const nextKey = monthKey(nd.getFullYear(), nd.getMonth())
-    const log = await fetchSettingsLog()
-    const restore = changes.filter(c => !log.some(e => e.month===nextKey && (e.tgId??null)===(tgId?Number(tgId):null) && e.param===c.param))
-    await writeSettingEntries(key, tgId, changes)
-    await writeSettingEntries(nextKey, tgId, restore.map(c => ({ param:c.param, value:c.old ?? null })))
-    return
-  }
-  await writeSettingEntries(key, tgId, changes)
+  await writeSettingEntries(monthKey(year, month), tgId, changes, onlyThisMonth)
 }
 
-async function writeSettingEntries(key, tgId, changes) {
+// Один запис на (місяць, людина, параметр, разовий/постійний): повторна зміна в тому ж місяці оновлює його, а не додає другий.
+// Notion округлює час створення до хвилини, тож «остання зміна виграє» за часом створення не гарантована.
+async function writeSettingEntries(key, tgId, changes, only = false) {
+  if (!changes.length) return
+  const tg = tgId ? Number(tgId) : null
+  const log = await fetchSettingsLog()
   for (const c of changes) {
-    await createPage(DB.settingsLog, {
-      'Місяць':     { title:[{ text:{ content:key } }] },
-      ...(tgId ? { 'ID': { number:Number(tgId) } } : {}),
-      'Параметр':   { rich_text:[{ text:{ content:c.param } }] },
-      'Значення':   { rich_text:[{ text:{ content:JSON.stringify(c.value ?? null) } }] },
+    const v = c.value ?? null
+    const props = {
+      'Значення':   { rich_text:[{ text:{ content:JSON.stringify(only ? { v, only:true } : v) } }] },
       'Дата зміни': { date:{ start:new Date().toISOString() } },
+    }
+    const mine = log.filter(e => e.month===key && (e.tgId??null)===tg && e.param===c.param)
+    const same = mine.filter(e => e.only===only)
+    if (same.length) await Promise.all(same.map(e => updatePage(e.id, props)))   // дублі (ручні правки) вирівнюємо теж
+    else await createPage(DB.settingsLog, {
+      'Місяць':     { title:[{ text:{ content:key } }] },
+      ...(tg ? { 'ID': { number:tg } } : {}),
+      'Параметр':   { rich_text:[{ text:{ content:c.param } }] },
+      ...props,
     })
+    // Постійна зміна «з цього місяця» скасовує разову цього ж місяця — інакше вона б її перекривала
+    if (!only) await Promise.all(mine.filter(e => e.only).map(e => archivePage(e.id)))
   }
+}
+
+export const PARAM_LABELS = {
+  rateHour:'Ставка за годину', ratePack:'Ставка за пачку', salary:'Фіксована зарплата',
+  bonusOff:'Бонуси', premiumOff:'Премія', lowRateOn:'Знижена ставка',
+  lowRateDays:'Поріг днів (знижена)', rateHourLow:'Знижена ставка за годину', ratePackLow:'Знижена ставка за пачку',
+  minDaysForBonus:'Мін. днів для бонусів', bonusPerLongDay:'Бонус за довгий день', bonusSaturday:'Бонус за суботу',
+  longDayHours:'Довгий день від (год)', longDaysNeeded:'Потрібно довгих днів', premiumDays:'Днів для премії', premiumAmount:'Сума премії',
+}
+export const paramLabel = param => PARAM_LABELS[String(param).replace(/^(ind|cfg)\./, '')] || param
+
+// ════════ ЗАКРИТТЯ МІСЯЦЯ ═══════════════════════════════════
+// База «Закриті місяці»: Місяць (title, 2026-10), Закрито (checkbox), Дата (date), Хто (text), Підсумок (text, JSON).
+// Закритий місяць: підсумки зафіксовані (знімок), записи за цей місяць не створюються, не змінюються й не видаляються.
+// «Відкрити знову» знімає замок (рядок лишається зі станом «не закрито»), тож автозакриття такий місяць більше не чіпає.
+// Автозакриття: коли власник відкриває додаток після 22:00 останнього дня місяця (або пізніше) — без сервера й таймера.
+export const closingEnabled = () => !!DB.monthClose
+export const CLOSE_HOUR = 22
+let CLOSED = new Map()          // ключ місяця (2026-10) → запис; оновлюється при кожному читанні, закритті й відкритті
+const MONTH_NAMES = ['січень','лютий','березень','квітень','травень','червень','липень','серпень','вересень','жовтень','листопад','грудень']
+
+const textAll = v => (v?.rich_text || v?.title || []).map(t => t.plain_text || '').join('')
+const chunkText = (s, n = 1900) => {            // у Notion один фрагмент тексту ≤ 2000 символів
+  const out = []; for (let i = 0; i < s.length; i += n) out.push({ text:{ content:s.slice(i, i+n) } })
+  return out.length ? out : [{ text:{ content:'' } }]
+}
+
+// Що саме фіксується в знімку для кожного працівника (усе, що показують картка й списки)
+const SNAP_KEYS = ['tgId','name','type','role','rateHour','ratePack','rateHourBase','ratePackBase','lowRateOn','lowRateDays','rateHourLow','ratePackLow','lowRateApplied',
+  'eMinDays','eLongNeed','ePremDays','ePremAmt','eLongBonus','eSatBonus','eLongHours','bonusOff','premiumOff',
+  'totalHours','totalPacks','workDays','longDays','saturdays','earnHours','earnPacks','base','bonusActive','bonusLong','bonusSat','premium','manualBonus',
+  'gross','totalAdv','debtPaid','totalFines','final','daysToBonus','longToBonus','daysToPremium']
+const KEEP_LIVE = new Set(['tgId','name','type','role'])      // ці поля беремо з живих даних (перейменування не псує архів)
+const snapshotOf = w => { const o = {}; SNAP_KEYS.forEach(k => { if (w[k] !== undefined) o[k] = w[k] }); return o }
+
+function parseSnapshot(v) {
+  try { const j = JSON.parse(textAll(v)); return Array.isArray(j?.workers) ? j.workers : [] } catch { return [] }
+}
+
+async function loadClosedRows() {
+  const r = await queryDB(DB.monthClose)
+  const byKey = new Map()
+  for (const x of r.results) {
+    const q = x.properties, key = p.text(q['Місяць'])
+    if (!key) continue
+    const e = { id:x.id, key, closed:p.bool(q['Закрито']), at:p.date(q['Дата']), by:p.text(q['Хто']), snapshot:parseSnapshot(q['Підсумок']), created:x.created_time||'' }
+    const cur = byKey.get(key)
+    if (!cur || (e.at||e.created) > (cur.at||cur.created)) byKey.set(key, e)      // дублі (дві вкладки одночасно) — береться новіший
+  }
+  const list = [...byKey.values()]
+  CLOSED = new Map(list.filter(e => e.closed).map(e => [e.key, e]))
+  return list
+}
+
+export async function fetchClosedMonths() {
+  if (!DB.monthClose) return []
+  try { return await loadClosedRows() } catch(e) { console.warn('Закриті місяці:', e.message); return [] }
+}
+
+export const isMonthClosed = dateStr => !!dateStr && CLOSED.has(String(dateStr).slice(0,7))
+export function assertMonthOpen(dateStr) {
+  if (!isMonthClosed(dateStr)) return
+  const [y, m] = String(dateStr).slice(0,7).split('-')
+  throw new Error(`Цей місяць закрито (${MONTH_NAMES[Number(m)-1]} ${y}) — записи заблоковано. Власник може відкрити його знову.`)
+}
+
+// Закрити місяць: знімок підсумків (як їх бачить власник) + замок
+export async function closeMonth(shared, year, month, by, md) {
+  if (!DB.monthClose) throw new Error('Не задано VITE_DB_MONTH_CLOSE')
+  const key = monthKey(year, month)
+  const rows = await loadClosedRows()                       // свіжий стан: інший власник міг закрити раніше
+  const cur = rows.find(e => e.key === key)
+  if (cur?.closed) return { already:true }
+  const data = md || await fetchMonthData(year, month)
+  const workers = calcAllWorkers(assembleData({ ...shared, closedMonths:[] }, data, year, month))    // без знімка: рахуємо наживо
+  const chunks = chunkText(JSON.stringify({ v:1, workers:workers.map(snapshotOf) }))
+  // Notion у запитах віддає не більше 25 фрагментів тексту на властивість — більший знімок прочитався б обрізаним
+  if (chunks.length > 24) throw new Error('Підсумок місяця завеликий для збереження в Notion — напиши розробнику')
+  const props = {
+    'Закрито':  { checkbox:true },
+    'Дата':     { date:{ start:new Date().toISOString() } },
+    'Хто':      { rich_text:[{ text:{ content:by||'' } }] },
+    'Підсумок': { rich_text:chunks },
+  }
+  if (cur) await updatePage(cur.id, props)
+  else await createPage(DB.monthClose, { 'Місяць':{ title:[{ text:{ content:key } }] }, ...props })
+  await loadClosedRows()
+  return { already:false }
+}
+
+// Відкрити знову: замок знімається, знімок лишається в рядку (до наступного закриття)
+export async function reopenMonth(year, month, by) {
+  if (!DB.monthClose) throw new Error('Не задано VITE_DB_MONTH_CLOSE')
+  const key = monthKey(year, month)
+  const cur = (await loadClosedRows()).find(e => e.key === key)
+  if (!cur || !cur.closed) return
+  await updatePage(cur.id, {
+    'Закрито': { checkbox:false },
+    'Дата':    { date:{ start:new Date().toISOString() } },
+    'Хто':     { rich_text:[{ text:{ content:by||'' } }] },
+  })
+  await loadClosedRows()
+}
+
+// Який місяць пора закривати: поточний — з 22:00 його останнього дня, інакше — попередній
+export function autoCloseTarget(now = new Date()) {
+  const edge = new Date(now.getFullYear(), now.getMonth()+1, 0, CLOSE_HOUR, 0, 0)
+  const d = now >= edge ? now : new Date(now.getFullYear(), now.getMonth()-1, 1)
+  return { year:d.getFullYear(), month:d.getMonth() }
+}
+
+// Викликається, коли відкриває додаток власник. Повертає { year, month }, якщо щойно закрили місяць.
+export async function autoCloseMonth(shared, by = 'авто') {
+  if (!DB.monthClose) return null
+  const { year, month } = autoCloseTarget()
+  const key = monthKey(year, month)
+  if ((shared.closedMonths||[]).some(e => e.key === key)) return null           // запис є — закритий або відкритий вручну: не чіпаємо
+  if ((await loadClosedRows()).some(e => e.key === key)) return null
+  const md = await fetchMonthData(year, month)
+  if (!(md.shifts.length + md.advances.length + md.bonuses.length + md.fines.length + md.debtPayments.length)) return null    // порожній місяць не закриваємо
+  const res = await closeMonth(shared, year, month, by, md)
+  return res.already ? null : { year, month }
 }
 
 export const EMPTY_MONTH = { shifts:[], advances:[], bonuses:[], debtPayments:[], fines:[] }
 
 // Дані, що не залежать від місяця (завантажуємо один раз)
 export async function fetchShared() {
-  const [staff, fixedStaff, debts, settings, settingsLog] = await Promise.all([
+  const [staff, fixedStaff, debts, settings, settingsLog, closedMonths] = await Promise.all([
     queryDB(DB.staff),
     queryDB(DB.fixedStaff),
     queryDB(DB.debts),
     fetchSettings(),
     fetchSettingsLog(),
+    fetchClosedMonths(),
   ])
   return {
     staff:       staff.results.map(parseStaff),
@@ -229,6 +364,7 @@ export async function fetchShared() {
     debts:       debts.results.map(parseDebt),
     cfg:         settings,
     settingsLog,
+    closedMonths,
   }
 }
 
@@ -260,8 +396,25 @@ export function assembleData(shared, md, year, month) {
     debts:      shared.debts,
     cfg:        shared.cfg,
   }
-  return applyHistory(base, monthKey(year, month), shared.settingsLog || [])
+  const key = monthKey(year, month)
+  const out = applyHistory(base, key, shared.settingsLog || [])
+  // Закритий місяць: підсумки беремо зі знімка (frozen), а не рахуємо наново
+  const closed = (shared.closedMonths || []).find(e => e.key === key && e.closed)
+  if (!closed) return out
+  return { ...out, closed:{ at:closed.at, by:closed.by }, frozen:Object.fromEntries(closed.snapshot.map(w => [w.tgId, w])) }
 }
+
+// Накладає знімок закритого місяця на живий розрахунок працівника
+function withFrozen(res, data) {
+  const fz = data.frozen && data.frozen[res.tgId]
+  if (!fz) return res
+  const out = { ...res, frozen:true }
+  Object.keys(fz).forEach(k => { if (!KEEP_LIVE.has(k)) out[k] = fz[k] })
+  return out
+}
+// Працівник, якого вже немає в живих даних (видалений), але він є в знімку закритого місяця
+const ghostWorker = fz => ({ ...fz, ghost:true, frozen:true, staffPageId:null, ind:{}, tempParams:[], days:[], fines:[], bonuses:[], advances:[],
+  debtRemaining:0, debtPageId:null, daysSinceEntry:0, lastEntry:null, fuelAccess:false })
 
 export async function fetchAllData(year, month) {
   const [shared, md] = await Promise.all([fetchShared(), fetchMonthData(year, month)])
@@ -353,6 +506,7 @@ function parseDP(r) {
 }
 
 export async function saveShift({ tgId, name, rateHour, ratePack, date, hours, packs, lunchBreak=1 }) {
+  assertMonthOpen(date)
   const actualHours = Math.max(0, hours - lunchBreak)
   return createPage(DB.shifts, {
     'ПІБ':                       { title:[{ text:{ content:name } }] },
@@ -367,7 +521,8 @@ export async function saveShift({ tgId, name, rateHour, ratePack, date, hours, p
   })
 }
 
-export async function updateShift(pageId, { hours, packs, rateHour, ratePack, lunchBreak=0 }) {
+export async function updateShift(pageId, { hours, packs, rateHour, ratePack, lunchBreak=0, date }) {
+  assertMonthOpen(date)
   const actualHours = Math.max(0, hours - lunchBreak)
   return updatePage(pageId, {
     'Години':                    { number:actualHours },
@@ -378,11 +533,12 @@ export async function updateShift(pageId, { hours, packs, rateHour, ratePack, lu
 }
 
 // Видалення зміни (архівує всі записи за день)
-export async function deleteShift(pageIds) {
+export async function deleteShift(pageIds, date) {
+  assertMonthOpen(date)
   for (const id of pageIds) { await archivePage(id) }
 }
 
-// Повне видалення працівника: всі зміни (за весь час) + аванси + премії + борги + сам запис у Персонал
+// Повне видалення працівника: всі зміни + аванси + премії + борги + сам запис у Персонал (крім записів закритих місяців)
 export async function deleteWorkerCompletely(tgId, staffPageId) {
   const filterByTg = {
     property: 'ID', number: { equals: Number(tgId) },
@@ -397,18 +553,22 @@ export async function deleteWorkerCompletely(tgId, staffPageId) {
     DB.fines ? queryDB(DB.fines, filterByTg) : Promise.resolve({results:[]}),
   ])
 
+  // Записи закритих місяців не чіпаємо: архів лишається цілим (борги без дати видаляються як раніше)
+  const dated = [...shiftsR.results, ...advR.results, ...bonusR.results, ...debtPayR.results, ...fineR.results]
+  const keep  = dated.filter(r => isMonthClosed(r.properties?.['Дата']?.date?.start))
   const allIds = [
-    ...shiftsR.results, ...advR.results, ...bonusR.results,
-    ...debtR.results, ...debtPayR.results, ...fineR.results,
+    ...dated.filter(r => !keep.includes(r)),
+    ...debtR.results,
   ].map(r => r.id)
 
   for (const id of allIds) { await archivePage(id) }
   if (staffPageId) await archivePage(staffPageId)
 
-  return { deletedRecords: allIds.length, staffDeleted: !!staffPageId }
+  return { deletedRecords: allIds.length, keptInClosed: keep.length, staffDeleted: !!staffPageId }
 }
 
 export async function saveBonusRecord({ tgId, name, date, amount, reason }) {
+  assertMonthOpen(date)
   return createPage(DB.bonuses, {
     'ПІБ':         { title:[{ text:{ content:name } }] },
     'ID':          { number:tgId },
@@ -420,6 +580,7 @@ export async function saveBonusRecord({ tgId, name, date, amount, reason }) {
 
 export async function saveFine({ tgId, name, date, amount, reason }) {
   if (!DB.fines) throw new Error('Не задано VITE_DB_FINES')
+  assertMonthOpen(date)
   return createPage(DB.fines, {
     'ПІБ':          { title:[{ text:{ content:name } }] },
     'ID':           { number:tgId },
@@ -429,7 +590,20 @@ export async function saveFine({ tgId, name, date, amount, reason }) {
   })
 }
 
+// Корекція штрафу (дата, сума, причина) і видалення
+export async function updateFine(pageId, { date, amount, reason, oldDate }) {
+  if (!DB.fines) throw new Error('Не задано VITE_DB_FINES')
+  assertMonthOpen(oldDate); assertMonthOpen(date)
+  return updatePage(pageId, {
+    'Дата':        { date:{ start:date } },
+    'Сума штрафу': { number:Number(amount) },
+    'Причина':     { rich_text:[{ text:{ content:reason||'' } }] },
+  })
+}
+export async function deleteFine(pageId, date) { assertMonthOpen(date); return archivePage(pageId) }
+
 export async function saveAdvance({ tgId, name, date, amount }) {
+  assertMonthOpen(date)
   return createPage(DB.advances, {
     'ПІБ':         { title:[{ text:{ content:name } }] },
     'ID':          { number:tgId },
@@ -439,6 +613,7 @@ export async function saveAdvance({ tgId, name, date, amount }) {
 }
 
 export async function saveDebtPayment({ tgId, name, date, amount, debtPageId, currentRemaining }) {
+  assertMonthOpen(date)
   await createPage(DB.debtPayments, {
     'ПІБ':          { title:[{ text:{ content:name } }] },
     'ID':           { number:tgId },
@@ -905,13 +1080,13 @@ export function calcSalary(tgId, data) {
   const lastEntry   = days.length ? days[days.length-1].date : null
   const daysSinceEntry = lastEntry ? Math.floor((new Date()-new Date(lastEntry))/(864e5)) : 99
 
-  return {
+  return withFrozen({
     tgId, name:si.name||'', rateHour, ratePack, rateHourBase:si.rateHour||0, ratePackBase:si.ratePack||0, staffPageId:si.id,
     lowRateOn:si.lowRateOn||false, lowRateDays:si.lowRateDays??19,
     rateHourLow:si.rateHourLow??null, ratePackLow:si.ratePackLow??null,
     lowRateApplied:useLowRate,
     eMinDays, eLongNeed, ePremDays, ePremAmt, eLongBonus, eSatBonus, eLongHours,
-    bonusOff, premiumOff, ind, fuelAccess:si.fuelAccess||false,
+    bonusOff, premiumOff, ind, fuelAccess:si.fuelAccess||false, tempParams:si.tempParams||[],
     totalHours, totalPacks, workDays, longDays:longDaysCalc, saturdays, days,
     earnHours, earnPacks, base, bonusActive,
     bonusLong, bonusSat, premium, manualBonus, gross,
@@ -926,7 +1101,7 @@ export function calcSalary(tgId, data) {
     lastEntry, daysSinceEntry,
     bonuses:  bonuses.filter(b=>b.tgId===tgId),
     advances: advances.filter(a=>a.tgId===tgId),
-  }
+  }, data)
 }
 
 export function calcAllWorkers(data) {
@@ -947,9 +1122,9 @@ export function calcAllWorkers(data) {
     const fines = (data.fines||[]).filter(f=>f.tgId===w.tgId)
     const totalFines = fines.reduce((s,f)=>s+f.amount,0)
     const debtInfo = data.debts.find(d=>d.tgId===w.tgId)
-    return {
+    return withFrozen({
       type:'fixed', tgId:w.tgId, name:w.name, role:w.role, staffPageId:w.id,
-      gross:w.salary, final:w.salary-totalAdv-debtPaid-totalFines,
+      gross:w.salary, tempParams:w.tempParams||[], final:w.salary-totalAdv-debtPaid-totalFines,
       totalAdv, debtPaid, totalFines, fines,
       debtRemaining: debtInfo?.remaining||0,
       debtPageId: debtInfo?.id||null,
@@ -959,9 +1134,12 @@ export function calcAllWorkers(data) {
       bonusActive:false,daysToBonus:0,longToBonus:0,daysToPremium:0,days:[],
       bonuses:[],advances:data.advances.filter(a=>a.tgId===w.tgId),
       daysSinceEntry:0,
-    }
+    }, data)
   })
-  return [...shiftWorkers, ...fixedWorkers]
+  // Закритий місяць: працівники, яких уже нема в живих даних, лишаються в архіві зі знімка
+  const have = new Set([...shiftWorkers, ...fixedWorkers].map(w=>w.tgId))
+  const ghosts = Object.values(data.frozen || {}).filter(fz => !have.has(fz.tgId)).map(ghostWorker)
+  return [...shiftWorkers, ...fixedWorkers, ...ghosts]
 }
 
 // ════════ ПАЛИВО ══════════════════════════════════════════
