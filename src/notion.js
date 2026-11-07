@@ -89,7 +89,7 @@ export const DEFAULT_CFG = {
   lunchBreak: 1, electricityTariff: 0,
 }
 
-export async function fetchSettings() {
+export async function fetchSettings(strict = false) {      // strict: помилку читання не маскуємо значеннями за замовчуванням
   try {
     const r = await queryDB(DB.settings)
     if (!r.results?.length) return DEFAULT_CFG
@@ -106,7 +106,7 @@ export async function fetchSettings() {
       electricityTariff:  p.num(q['Тариф електрики'])       ?? 0,
       pageId: r.results[0].id,
     }
-  } catch { return DEFAULT_CFG }
+  } catch(e) { if (strict) throw e; return DEFAULT_CFG }
 }
 
 export async function saveSettings(pageId, cfg, onlyKeys) {
@@ -140,7 +140,7 @@ export const historyEnabled = () => !!DB.settingsLog
 const monthKey = (y, m) => `${y}-${String(m+1).padStart(2,'0')}`
 const HIST_CFG = ['minDaysForBonus','bonusPerLongDay','bonusSaturday','premiumDays','premiumAmount','longDayHours','longDaysNeeded']
 
-async function fetchSettingsLog() {
+async function fetchSettingsLog(strict = false) {          // strict: перед записом історії помилку читання не ховаємо
   if (!DB.settingsLog) return []
   try {
     const r = await queryDB(DB.settingsLog)
@@ -152,7 +152,7 @@ async function fetchSettingsLog() {
       if (value && typeof value==='object' && !Array.isArray(value) && 'v' in value) { only = !!value.only; value = value.v }
       return { id:x.id, month:p.text(q['Місяць']), tgId:p.numN(q['ID']), param:p.text(q['Параметр']), value, only, created:x.created_time||'' }
     }).filter(e => e.month && e.param)
-  } catch { return [] }
+  } catch(e) { if (strict) throw e; return [] }
 }
 
 // У межах одного місяця разовий запис («тільки цей місяць») сильніший за постійний
@@ -198,30 +198,98 @@ export async function saveSettingChanges(year, month, tgId, changes, onlyThisMon
   await writeSettingEntries(monthKey(year, month), tgId, changes, onlyThisMonth)
 }
 
+const entryValue = valueText => ({
+  'Значення':   { rich_text:[{ text:{ content:valueText } }] },
+  'Дата зміни': { date:{ start:new Date().toISOString() } },
+})
+const newEntryProps = (key, tg, param, valueText) => ({
+  'Місяць':     { title:[{ text:{ content:key } }] },
+  ...(tg ? { 'ID': { number:tg } } : {}),
+  'Параметр':   { rich_text:[{ text:{ content:param } }] },
+  ...entryValue(valueText),
+})
+
 // Один запис на (місяць, людина, параметр, разовий/постійний): повторна зміна в тому ж місяці оновлює його, а не додає другий.
 // Notion округлює час створення до хвилини, тож «остання зміна виграє» за часом створення не гарантована.
 async function writeSettingEntries(key, tgId, changes, only = false) {
   if (!changes.length) return
   const tg = tgId ? Number(tgId) : null
-  const log = await fetchSettingsLog()
+  const log = await fetchSettingsLog(true)        // якщо історію не вдалося прочитати — не пишемо наосліп (інакше з'являться дублі)
   for (const c of changes) {
     const v = c.value ?? null
-    const props = {
-      'Значення':   { rich_text:[{ text:{ content:JSON.stringify(only ? { v, only:true } : v) } }] },
-      'Дата зміни': { date:{ start:new Date().toISOString() } },
-    }
+    const text = JSON.stringify(only ? { v, only:true } : v)
     const mine = log.filter(e => e.month===key && (e.tgId??null)===tg && e.param===c.param)
     const same = mine.filter(e => e.only===only)
-    if (same.length) await Promise.all(same.map(e => updatePage(e.id, props)))   // дублі (ручні правки) вирівнюємо теж
-    else await createPage(DB.settingsLog, {
-      'Місяць':     { title:[{ text:{ content:key } }] },
-      ...(tg ? { 'ID': { number:tg } } : {}),
-      'Параметр':   { rich_text:[{ text:{ content:c.param } }] },
-      ...props,
-    })
+    if (same.length) await Promise.all(same.map(e => updatePage(e.id, entryValue(text))))   // дублі (ручні правки) вирівнюємо теж
+    else await createPage(DB.settingsLog, newEntryProps(key, tg, c.param, text))
     // Постійна зміна «з цього місяця» скасовує разову цього ж місяця — інакше вона б її перекривала
     if (!only) await Promise.all(mine.filter(e => e.only).map(e => archivePage(e.id)))
   }
+}
+
+// ════════ «ЗАПАМʼЯТАТИ ТЕПЕРІШНІ УМОВИ» (одноразово) ═══════════
+// Записує в історію з поточного місяця те, що діє зараз, але ще не записане: ставки й умови всіх працівників і загальні налаштування.
+// Із таблиць «Персонал» / «Налаштування» нічого не забирається, розрахунки не змінюються (пишуться ті самі значення, що й діють).
+// Після запису в історії лишається позначка (параметр «baseline»), і кнопка в налаштуваннях зникає. Повторний запуск лише доповнює.
+const BASELINE = 'baseline'
+export const termsSaved = log => (log || []).some(e => e.param === BASELINE)
+
+export async function planTermsSeed(year, month) {
+  if (!DB.settingsLog) throw new Error('Не задано VITE_DB_SETTINGS_LOG')
+  const key = monthKey(year, month)
+  // читаємо суворо: якщо щось не прочиталось — краще помилка, ніж записати значення за замовчуванням як «теперішні»
+  const [staffR, fixedR, cfg, log] = await Promise.all([queryDB(DB.staff), queryDB(DB.fixedStaff), fetchSettings(true), fetchSettingsLog(true)])
+  const perm = log.filter(e => !e.only && e.param !== BASELINE)       // разові значення не рахуємо: записуємо постійні
+  const recorded = pickEntries(perm, key)                              // що вже є в історії (≤ поточного місяця)
+  const eff = applyHistory({ cfg, staff:staffR.results.map(parseStaff), fixedStaff:fixedR.results.map(parseFixed) }, key, perm)
+  const items = [], people = new Set()
+  let noId = 0
+  const put = (tgId, param, value) => {
+    if (value === null || value === undefined || (typeof value === 'number' && !Number.isFinite(value))) return
+    if (recorded.has(`${tgId ?? '*'}|${param}`)) return
+    items.push({ tgId, param, value }); if (tgId) people.add(tgId)
+  }
+  HIST_CFG.forEach(k => put(null, 'cfg.' + k, eff.cfg[k]))
+  eff.staff.forEach(s => {
+    if (!s.tgId) { noId++; return }
+    put(s.tgId, 'rateHour', Number(s.rateHour)); put(s.tgId, 'ratePack', Number(s.ratePack))
+    put(s.tgId, 'bonusOff', !!s.bonusOff); put(s.tgId, 'premiumOff', !!s.premiumOff); put(s.tgId, 'lowRateOn', !!s.lowRateOn)
+    if (s.lowRateOn) { put(s.tgId, 'lowRateDays', s.lowRateDays); put(s.tgId, 'rateHourLow', s.rateHourLow); put(s.tgId, 'ratePackLow', s.ratePackLow) }
+    HIST_CFG.forEach(k => put(s.tgId, 'ind.' + k, s.ind?.[k]))         // індивідуальні суми й умови (порожні = загальні, їх не пишемо)
+  })
+  eff.fixedStaff.forEach(f => { if (!f.tgId) { noId++; return } put(f.tgId, 'salary', Number(f.salary)) })
+  return { key, items, people:people.size, noId }
+}
+
+// Тимчасові збої Notion (ліміт запитів, мережа) переживаємо повторами; решту помилок віддаємо одразу
+const TRANSIENT = /rate|limit|timeout|timed out|fetch|network|temporar|unavailable|gateway|overload|429|50\d/i
+async function withRetry(fn, tries = 4) {
+  for (let t = 1, wait = 700; ; t++, wait *= 2) {
+    try { return await fn() }
+    catch (e) { if (t >= tries || !TRANSIENT.test(String(e?.message || ''))) throw e; await new Promise(r => setTimeout(r, wait)) }
+  }
+}
+
+export async function applyTermsSeed(year, month, by, onProgress) {
+  const plan = await planTermsSeed(year, month)       // свіжий стан: усе, що вже записано, пропускається (повторний запуск не дублює)
+  const { key, items } = plan
+  const queue = [...items]
+  let done = 0, stop = false
+  onProgress?.(0, items.length)
+  const run = async () => {
+    while (!stop && queue.length) {
+      const it = queue.shift()
+      try { await withRetry(() => createPage(DB.settingsLog, newEntryProps(key, it.tgId ? Number(it.tgId) : null, it.param, JSON.stringify(it.value)))) }
+      catch (e) { stop = true; throw e }
+      onProgress?.(++done, items.length)
+    }
+  }
+  // два запити водночас: швидше, але в межах ліміту Notion; чекаємо обох, щоб після помилки ніщо не дописувалось у фоні
+  const res = await Promise.allSettled([run(), run()])
+  const bad = res.find(r => r.status === 'rejected')
+  if (bad) throw bad.reason
+  await withRetry(() => createPage(DB.settingsLog, newEntryProps(key, null, BASELINE, JSON.stringify({ count:items.length, by:by || '' }))))
+  return { written:items.length, people:plan.people, key }
 }
 
 export const PARAM_LABELS = {

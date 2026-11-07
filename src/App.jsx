@@ -4,7 +4,7 @@ import { fetchShared, fetchMonthData, assembleData, EMPTY_MONTH, fetchMonthlySta
          calcAllWorkers, calcSalary, saveShift, updateShift, deleteShift, saveBonusRecord, saveFine, updateFine, deleteFine,
          paramLabel, closingEnabled, closeMonth, reopenMonth, autoCloseMonth, saveAdvance, saveDebtPayment, addDebt, addStaff, addFixedStaff,
          updateStaffRates, updateFixedSalary, updateStaffInfo, deleteStaff, deleteWorkerCompletely,
-         updateStaffToggles, saveSettings, saveSettingChanges, historyEnabled, checkAccess, writeLog, DEFAULT_CFG,
+         updateStaffToggles, saveSettings, saveSettingChanges, historyEnabled, planTermsSeed, applyTermsSeed, termsSaved, checkAccess, writeLog, DEFAULT_CFG,
          fetchShipmentRefs, fetchShipmentRows, groupShipments,
          saveShipmentGroup, updateShipmentGroup, deleteShipmentGroup,
          statsByMaterial, statsByFirm, buildShipmentReport,
@@ -1395,7 +1395,65 @@ function AddWorkerForm({onClose,onSaved,tgId,tgName}) {
 // ================================================================
 // ФОРМА НАЛАШТУВАНЬ
 // ================================================================
-function SettingsForm({cfg,onClose,onSaved,tgId,tgName,year,month}) {
+// Одноразово: записати в історію те, що діє зараз (ставки й умови всіх працівників + загальні налаштування).
+// Із таблиць нічого не забирається, розрахунки не змінюються. Після запису кнопка зникає.
+function RememberTerms({already,tgId,tgName,onDone}) {
+  const [phase, setPhase] = useState(already ? 'hidden' : 'idle')     // idle | checking | confirm | writing | done | error
+  const [plan,  setPlan]  = useState(null)
+  const [prog,  setProg]  = useState({done:0,total:0})
+  const [error, setError] = useState(null)
+  if (phase==='hidden') return null
+  const nowD = new Date(), yr = nowD.getFullYear(), mo = nowD.getMonth(), name = MONTHS_UA[mo]
+  const btn = primary => ({flex:1,border:primary?'none':`1.5px solid ${C.ink}`,borderRadius:14,padding:'12px 10px',fontSize:14,fontWeight:800,cursor:'pointer',fontFamily:'inherit',
+    background:primary?C.ink:'transparent',color:primary?C.yellow:C.ink})
+
+  async function check() {
+    try { setPhase('checking'); setError(null); setPlan(await planTermsSeed(yr, mo)); setPhase('confirm') }
+    catch(e){ vibrate('error'); setError(e.message); setPhase('error') }
+  }
+  async function write() {
+    try {
+      setPhase('writing'); setError(null); setProg({done:0,total:plan?.items.length||0})
+      const r = await applyTermsSeed(yr, mo, tgName, (d,t)=>setProg({done:d,total:t}))
+      await writeLog({tgId,name:tgName,action:'Історія: записано теперішні умови',details:`${r.written} значень, ${name} ${yr}`})
+      vibrate('success'); setPlan(p=>({...p,written:r.written})); setPhase('done'); onDone?.()
+    } catch(e){ vibrate('error'); setError(e.message); setPhase('error') }
+  }
+
+  const n = plan?.items.length||0
+  return <div role="group" aria-label="Запамʼятати теперішні умови" style={{background:'rgba(23,23,23,0.04)',borderRadius:14,padding:'12px 14px',display:'flex',flexDirection:'column',gap:10,marginTop:18}}>
+    <div>
+      <div style={{fontSize:14,fontWeight:700,color:C.text}}>Запамʼятати теперішні умови</div>
+      <div style={{fontSize:12,color:C.muted,marginTop:2,lineHeight:1.45}}>
+        Одноразово: ставки й умови всіх працівників та загальні налаштування запишуться в історію з поточного місяця ({name}). Нічого не забирається й не змінюється, це лише запис.
+      </div>
+    </div>
+    {error&&<div style={{color:C.red,fontSize:12,padding:'8px 12px',background:`${C.red}11`,borderRadius:8}}>{error}</div>}
+    {(phase==='idle'||phase==='checking'||phase==='error')&&
+      <button type="button" disabled={phase==='checking'} onClick={()=>{vibrate('light');check()}} style={{...btn(false),flex:'none',width:'100%',opacity:phase==='checking'?.6:1}}>
+        {phase==='checking'?'Перевіряю...':phase==='error'?'Спробувати ще раз':'Запамʼятати'}
+      </button>}
+    {phase==='confirm'&&<>
+      <div style={{fontSize:12.5,color:C.ink,lineHeight:1.45}}>
+        {n ? `Буде записано ${n} значень: ${plan.people} працівників і загальні налаштування (${name}).` : 'Усе вже є в історії, додавати нічого.'}
+        {plan.noId>0&&` Без Telegram-ID пропущено: ${plan.noId}.`}
+      </div>
+      <div style={{display:'flex',gap:8}}>
+        <button type="button" onClick={()=>setPhase('idle')} style={btn(false)}>Скасувати</button>
+        <button type="button" onClick={()=>{vibrate('light');write()}} style={btn(true)}>{n?'Так, записати':'Готово'}</button>
+      </div>
+    </>}
+    {phase==='writing'&&<>
+      <div style={{fontSize:12.5,color:C.ink}}>Записую... {prog.done} з {prog.total}</div>
+      <Prog val={prog.done} max={prog.total} color={C.ink}/>
+    </>}
+    {phase==='done'&&<div style={{fontSize:12.5,color:C.ink,fontWeight:700,lineHeight:1.45}}>
+      Готово: теперішні умови записано в історію{plan?.written?` (${plan.written})`:''}. Ця кнопка більше не з’явиться.
+    </div>}
+  </div>
+}
+
+function SettingsForm({cfg,onClose,onSaved,tgId,tgName,year,month,termsDone}) {
   const [form,    setForm]    = useState({...cfg})
   const [once,    setOnce]    = useState(false)
   const [loading, setLoading] = useState(false)
@@ -1448,6 +1506,7 @@ function SettingsForm({cfg,onClose,onSaved,tgId,tgName,year,month}) {
         {loading?'Збереження...':success?<Done/>:'Зберегти'}
       </button>
     </form>
+    {historyEnabled()&&<RememberTerms already={termsDone} tgId={tgId} tgName={tgName} onDone={onSaved}/>}
   </Sheet>
 }
 
@@ -2684,7 +2743,7 @@ const blankWorker = s => ({...s,totalHours:0,totalPacks:0,workDays:0,longDays:0,
   bonusActive:false,bonusLong:0,bonusSat:0,premium:0,manualBonus:0,gross:0,totalAdv:0,debtPaid:0,totalFines:0,fines:[],final:0,
   daysToBonus:s.eMinDays||0,longToBonus:s.eLongNeed||0,daysToPremium:s.ePremDays||0,lastEntry:null,daysSinceEntry:0,bonuses:[],advances:[],lowRateApplied:false})
 
-function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthChange,loading,busy}) {
+function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthChange,loading,busy,termsDone}) {
   const [view,   setView]   = useState('main')
   const [detailId, setDetailId] = useState(null)
   const snap = useRef(null)
@@ -2822,7 +2881,7 @@ function OwnerDashboard({workers,onRefresh,tgId,tgName,cfg,year,month,onMonthCha
     {modal==='bonus'    &&<BonusForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(null)} onSaved={refresh} tgId={tgId} tgName={tgName}/>}
     {modal==='fine'     &&<FineForm worker={workers[0]||{}} allWorkers={workers} onClose={()=>setModal(null)} onSaved={refresh} tgId={tgId} tgName={tgName}/>}
     {modal==='addworker'&&<AddWorkerForm onClose={()=>setModal(null)} onSaved={refresh} tgId={tgId} tgName={tgName}/>}
-    {modal==='settings' &&<SettingsForm year={year} month={month} cfg={cfg} onClose={()=>setModal(null)} onSaved={refresh} tgId={tgId} tgName={tgName}/>}
+    {modal==='settings' &&<SettingsForm year={year} month={month} cfg={cfg} termsDone={termsDone} onClose={()=>setModal(null)} onSaved={refresh} tgId={tgId} tgName={tgName}/>}
   </div>
 }
 
@@ -3125,7 +3184,7 @@ export default function App() {
     </div>
   )
 
-  if (state==='owner')  return <LockCtx.Provider value={lockValue}><OwnerDashboard workers={workers} onRefresh={refresh} tgId={tgId} tgName={tgName} cfg={data?.cfg||DEFAULT_CFG} year={year} month={month} onMonthChange={handleMonthChange} loading={loadingMonth} busy={busy>0}/><Toast text={toast}/></LockCtx.Provider>
+  if (state==='owner')  return <LockCtx.Provider value={lockValue}><OwnerDashboard workers={workers} onRefresh={refresh} tgId={tgId} tgName={tgName} cfg={data?.cfg||DEFAULT_CFG} year={year} month={month} onMonthChange={handleMonthChange} loading={loadingMonth} busy={busy>0} termsDone={termsSaved(shared?.settingsLog)}/><Toast text={toast}/></LockCtx.Provider>
   if (state==='worker') return <LockCtx.Provider value={lockValue}><WorkerView tgId={tgId} data={data} onRefresh={refresh} loading={loadingMonth} busy={busy>0}/><Toast text={toast}/></LockCtx.Provider>
   return null
 }
