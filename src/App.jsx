@@ -1111,8 +1111,12 @@ function TempNote({params}) {
 function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
   const isFixed = worker.type==='fixed'
   const [once, setOnce] = useState(false)
-  const [val,        setVal]        = useState(isFixed?(worker.gross||''):(worker.rateHour||''))
-  const [valPack,    setValPack]    = useState(worker.ratePack||'')
+  // Форма редагує ЗВИЧАЙНІ ставки. worker.rateHour/ratePack — «діючі»: коли застосовується знижена ставка, це вона, тож брати їх у форму
+  // не можна (збереження перезаписало б звичайну ставку зниженою). Без картки в «Персонал» знижених ставок нема — беремо діючу.
+  const regHour = worker.staffPageId ? worker.rateHourBase : worker.rateHour
+  const regPack = worker.staffPageId ? worker.ratePackBase : worker.ratePack
+  const [val,        setVal]        = useState(isFixed?(worker.gross||''):(regHour||''))
+  const [valPack,    setValPack]    = useState(regPack||'')
   const [bonusOff,   setBonusOff]   = useState(worker.bonusOff||false)
   const [premiumOff, setPremiumOff] = useState(worker.premiumOff||false)
   const [fuelAccess, setFuelAccess] = useState(worker.fuelAccess||false)
@@ -1149,8 +1153,8 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
         const add = (param, nv, ov) => { if (nv!==ov) changes.push({param, value:nv}) }
         if (isFixed) add('salary', nz(val), nz(worker.gross))
         else {
-          add('rateHour', nz(val), nz(worker.rateHourBase ?? worker.rateHour))
-          add('ratePack', nz(valPack), nz(worker.ratePackBase ?? worker.ratePack))
+          add('rateHour', nz(val), nz(regHour))
+          add('ratePack', nz(valPack), nz(regPack))
           add('bonusOff', !!bonusOff, !!worker.bonusOff)
           add('premiumOff', !!premiumOff, !!worker.premiumOff)
           add('lowRateOn', !!lowRateOn, !!worker.lowRateOn)
@@ -1200,8 +1204,8 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
       {isFixed
         ? <div><Lbl>ФІКСОВАНА ЗАРПЛАТА (грн/міс)</Lbl><input type="number" value={val} onChange={e=>setVal(e.target.value)} placeholder={`Зараз: ${worker.gross||'—'}`} style={inp}/></div>
         : <>
-          <div><Lbl>СТАВКА ЗА ГОДИНУ (грн)</Lbl><input type="number" value={val} onChange={e=>setVal(e.target.value)} placeholder={`Зараз: ${worker.rateHour||'—'}`} style={inp}/></div>
-          <div><Lbl>СТАВКА ЗА ПАЧКУ (грн)</Lbl><input type="number" value={valPack} onChange={e=>setValPack(e.target.value)} placeholder={`Зараз: ${worker.ratePack||'—'}`} style={inp}/></div>
+          <div><Lbl>СТАВКА ЗА ГОДИНУ (грн)</Lbl><input type="number" value={val} onChange={e=>setVal(e.target.value)} placeholder={`Зараз: ${regHour||'—'}`} style={inp}/></div>
+          <div><Lbl>СТАВКА ЗА ПАЧКУ (грн)</Lbl><input type="number" value={valPack} onChange={e=>setValPack(e.target.value)} placeholder={`Зараз: ${regPack||'—'}`} style={inp}/></div>
           <div>
             <Lbl>НАРАХУВАННЯ ВИПЛАТ</Lbl>
             <div style={{display:'flex',flexDirection:'column',gap:8}}>
@@ -1219,8 +1223,8 @@ function RatesForm({worker,onClose,onSaved,tgId,tgName,cfg,year,month}) {
             {lowRateOn&&<div style={{display:'flex',flexDirection:'column',gap:10,marginTop:10}}>
               <div style={{fontSize:12,color:C.muted}}>Якщо робочих днів за місяць менше порогу — застосується знижена ставка на ВЕСЬ місяць</div>
               <div><Lbl>ПОРІГ ДНІВ</Lbl><input type="number" value={lowRateDays} onChange={e=>setLowRateDays(e.target.value)} placeholder="напр. 19" style={inp}/></div>
-              <div><Lbl>ЗНИЖЕНА СТАВКА ЗА ГОДИНУ (грн)</Lbl><input type="number" value={rateHourLow} onChange={e=>setRateHourLow(e.target.value)} placeholder={`Звичайна: ${worker.rateHour||'—'}`} style={inp}/></div>
-              <div><Lbl>ЗНИЖЕНА СТАВКА ЗА ПАЧКУ (грн)</Lbl><input type="number" value={ratePackLow} onChange={e=>setRatePackLow(e.target.value)} placeholder={`Звичайна: ${worker.ratePack||'—'}`} style={inp}/></div>
+              <div><Lbl>ЗНИЖЕНА СТАВКА ЗА ГОДИНУ (грн)</Lbl><input type="number" value={rateHourLow} onChange={e=>setRateHourLow(e.target.value)} placeholder={`Звичайна: ${regHour||'—'}`} style={inp}/></div>
+              <div><Lbl>ЗНИЖЕНА СТАВКА ЗА ПАЧКУ (грн)</Lbl><input type="number" value={ratePackLow} onChange={e=>setRatePackLow(e.target.value)} placeholder={`Звичайна: ${regPack||'—'}`} style={inp}/></div>
             </div>}
           </div>
 
